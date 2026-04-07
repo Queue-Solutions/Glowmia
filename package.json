@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "framer-motion": "^10.16.4",
     "lucide-react": "^0.263.1",
     "next": "^14.0.0",
