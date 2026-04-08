@@ -87,6 +87,17 @@ a {
   --glow-2: rgba(167, 138, 82, 0.1);
 }
 
+.theme-light {
+  --button-burgundy: #6d1837;
+  --button-burgundy-deep: #4e1026;
+  --button-burgundy-ink: #5a1730;
+  --button-burgundy-soft: rgba(109, 24, 55, 0.1);
+  --button-burgundy-line: rgba(109, 24, 55, 0.24);
+  --button-ivory: #fff8f5;
+  --button-shadow-soft: 0 14px 28px rgba(109, 24, 55, 0.1);
+  --button-shadow-strong: 0 18px 38px rgba(109, 24, 55, 0.22);
+}
+
 .site-theme {
   position: relative;
   min-height: 100vh;
@@ -98,10 +109,23 @@ a {
 .site-background {
   position: fixed;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
   background:
     radial-gradient(circle at top left, var(--glow-1), transparent 24rem),
     radial-gradient(circle at bottom right, var(--glow-2), transparent 28rem);
+}
+
+.site-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.theme-light .site-background {
+  background: url('/dresses/covers/background.png');
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .chrome-button,
@@ -169,6 +193,104 @@ a {
 .secondary-button:hover,
 .pill-button:hover {
   transform: translateY(-1px);
+}
+
+.theme-light .chrome-button,
+.theme-light .secondary-button {
+  border-color: rgba(125, 31, 64, 0.42);
+  background:
+    linear-gradient(135deg, #7a1d42 0%, var(--button-burgundy) 48%, var(--button-burgundy-deep) 100%);
+  color: var(--button-ivory);
+  box-shadow: var(--button-shadow-strong);
+}
+
+.theme-light .pill-button {
+  border-color: rgba(125, 31, 64, 0.18);
+  background: rgba(255, 249, 245, 0.84);
+  color: var(--button-burgundy-ink);
+  box-shadow: none;
+}
+
+.theme-light .chrome-button,
+.theme-light .primary-button,
+.theme-light .secondary-button,
+.theme-light .pill-button {
+  letter-spacing: 0.04em;
+}
+
+.theme-light .primary-button {
+  border: 1px solid rgba(125, 31, 64, 0.42);
+  background:
+    linear-gradient(135deg, #7a1d42 0%, var(--button-burgundy) 48%, var(--button-burgundy-deep) 100%);
+  color: var(--button-ivory);
+  box-shadow: var(--button-shadow-strong);
+}
+
+.theme-light .secondary-button--active {
+  border-color: rgba(125, 31, 64, 0.44);
+  background:
+    linear-gradient(135deg, #7a1d42 0%, var(--button-burgundy) 45%, var(--button-burgundy-deep) 100%);
+  color: var(--button-ivory);
+  box-shadow: var(--button-shadow-strong);
+}
+
+.theme-light .pill-button--active {
+  border-color: rgba(125, 31, 64, 0.34);
+  background: linear-gradient(135deg, #7a1d42 0%, var(--button-burgundy) 45%, var(--button-burgundy-deep) 100%);
+  color: var(--button-ivory);
+  box-shadow: none;
+}
+
+.theme-light .chrome-button:hover,
+.theme-light .secondary-button:hover {
+  border-color: rgba(125, 31, 64, 0.34);
+  background:
+    linear-gradient(135deg, #862248 0%, #6d1837 45%, #471020 100%);
+  color: var(--button-ivory);
+  box-shadow: 0 22px 40px rgba(109, 24, 55, 0.28);
+}
+
+.theme-light .pill-button:hover {
+  border-color: rgba(125, 31, 64, 0.34);
+  background: rgba(255, 252, 248, 0.96);
+  color: var(--button-burgundy);
+  box-shadow: none;
+}
+
+.theme-light .primary-button:hover,
+.theme-light .secondary-button--active:hover,
+.theme-light .pill-button--active:hover {
+  background:
+    linear-gradient(135deg, #862248 0%, #6d1837 45%, #471020 100%);
+  box-shadow: 0 22px 40px rgba(109, 24, 55, 0.28);
+}
+
+.theme-light .chrome-button:focus-visible,
+.theme-light .primary-button:focus-visible,
+.theme-light .secondary-button:focus-visible,
+.theme-light .pill-button:focus-visible {
+  outline: 2px solid rgba(125, 31, 64, 0.26);
+  outline-offset: 3px;
+}
+
+.theme-light .primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+}
+
+.theme-light .header-nav-pill,
+.theme-light .mobile-menu-link--active {
+  background: linear-gradient(135deg, #7a1d42 0%, var(--button-burgundy) 45%, var(--button-burgundy-deep) 100%);
+  box-shadow: 0 18px 36px rgba(109, 24, 55, 0.22);
+}
+
+.theme-light .header-nav-pill {
+  border: 1px solid rgba(125, 31, 64, 0.2);
+}
+
+.theme-light .mobile-menu-link--active {
+  color: var(--button-ivory);
 }
 
 .header-nav-link {

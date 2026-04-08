@@ -9,9 +9,18 @@ type SiteHeaderProps = {
   currentPath: string;
 };
 
+function HangerIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 6.25a2.25 2.25 0 1 0-2.15-2.88" />
+      <path d="M12 6.25v1.35c0 .74-.41 1.41-1.07 1.75l-5.7 2.96A2.25 2.25 0 0 0 6.27 16h11.46a2.25 2.25 0 0 0 1.04-4.24l-5.7-2.96A1.97 1.97 0 0 1 12 7.6" />
+    </svg>
+  );
+}
+
 const navIcons = {
   '/': Home,
-  '/designs': Shirt,
+  '/designs': HangerIcon,
   '/agent': Bot,
 } as const;
 

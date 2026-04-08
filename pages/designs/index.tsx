@@ -81,7 +81,7 @@ export default function DesignsPage({ designs }: InferGetServerSidePropsType<typ
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
               {filterOrder.map((filterKey) => (
                 <button
                   key={filterKey}

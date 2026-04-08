@@ -16,7 +16,7 @@ export function SiteLayout({ currentPath, children }: SiteLayoutProps) {
     <div className={`site-theme ${darkMode ? 'theme-dark' : 'theme-light'} ${language === 'ar' ? 'lang-ar' : ''}`}>
       <CursorAura />
       <div className="site-background" />
-      <div className="relative min-h-screen">
+      <div className="site-shell min-h-screen">
         <SiteHeader currentPath={currentPath} />
         <main className="pb-16 pt-6 md:pt-8">{children}</main>
         <SiteFooter />
