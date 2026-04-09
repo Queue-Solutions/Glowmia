@@ -28,7 +28,7 @@ export function FeaturedDesigns({ designs }: { designs: Design[] }) {
       </div>
 
       {designs.length > 0 ? (
-        <DesignGrid designs={designs} />
+        <DesignGrid designs={designs} priorityCount={3} />
       ) : (
         <div className="rounded-[2rem] border border-dashed border-[color:var(--line)] px-6 py-12 text-center">
           <p className="text-base leading-7 text-[color:var(--text-muted)]">

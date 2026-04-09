@@ -39,10 +39,7 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)] font-display text-xl">
             G
           </span>
-          <span>
-            <span className="font-display text-2xl leading-none">Glowmia</span>
-            <span className="mt-1 block text-xs uppercase tracking-[0.28em] text-[color:var(--text-muted)]">Portfolio</span>
-          </span>
+          <span className="font-display text-2xl leading-none">Glowmia</span>
         </Link>
 
         <nav className="hidden items-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)]/92 p-1 md:flex">

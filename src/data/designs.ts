@@ -332,7 +332,19 @@ export function getFeaturedDesignsFromList(designs: Design[]) {
 }
 
 export function getDesignBySlug(designs: Design[], slug: string) {
-  return designs.find((design) => design.slug === slug) ?? null;
+  const exactMatch = designs.find((design) => design.slug === slug);
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const slugId = slug.split('--').pop();
+
+  if (!slugId) {
+    return null;
+  }
+
+  return designs.find((design) => design.id === slugId) ?? null;
 }
 
 export function getRelatedDesignsFromList(designs: Design[], current: Design, limit = 3) {
