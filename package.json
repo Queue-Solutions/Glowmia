@@ -6,10 +6,13 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "next lint"
+    "lint": "next lint",
+    "admin:secrets": "node scripts/admin-secrets.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
+    "@types/formidable": "^3.5.1",
+    "formidable": "^3.5.4",
     "framer-motion": "^10.16.4",
     "lucide-react": "^0.263.1",
     "next": "^14.0.0",

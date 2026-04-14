@@ -6,13 +6,14 @@ import { BrandIntro } from '@/src/components/site/BrandIntro';
 import { FeaturedDesigns } from '@/src/components/designs/FeaturedDesigns';
 import { AgentTeaser } from '@/src/components/site/AgentTeaser';
 import { getFeaturedDesignsFromList, type Design } from '@/src/data/designs';
-import { getAllDesignsFromSupabase } from '@/src/services/dresses';
+import { getAllDesignsFromSupabase, PUBLIC_PAGE_CACHE_CONTROL } from '@/src/services/dresses';
 
 type HomePageProps = {
   featuredDesigns: Design[];
 };
 
-export const getServerSideProps: GetServerSideProps<HomePageProps> = async () => {
+export const getServerSideProps: GetServerSideProps<HomePageProps> = async ({ res }) => {
+  res.setHeader('Cache-Control', PUBLIC_PAGE_CACHE_CONTROL);
   const designs = await getAllDesignsFromSupabase();
 
   return {

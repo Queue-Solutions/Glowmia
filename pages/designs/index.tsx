@@ -7,7 +7,7 @@ import { DesignGrid } from '@/src/components/designs/DesignGrid';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
 import { localizeText, type Design } from '@/src/data/designs';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
-import { getAllDesignsFromSupabase } from '@/src/services/dresses';
+import { getAllDesignsFromSupabase, PUBLIC_PAGE_CACHE_CONTROL } from '@/src/services/dresses';
 
 type FilterKey = 'all' | 'evening' | 'casual' | 'formal' | 'new';
 
@@ -17,7 +17,8 @@ type DesignsPageProps = {
 
 const filterOrder: FilterKey[] = ['all', 'evening', 'casual', 'formal', 'new'];
 
-export const getServerSideProps: GetServerSideProps<DesignsPageProps> = async () => {
+export const getServerSideProps: GetServerSideProps<DesignsPageProps> = async ({ res }) => {
+  res.setHeader('Cache-Control', PUBLIC_PAGE_CACHE_CONTROL);
   const designs = await getAllDesignsFromSupabase();
 
   return {
@@ -106,7 +107,7 @@ export default function DesignsPage({ designs }: InferGetServerSidePropsType<typ
           </div>
 
           {filteredDesigns.length > 0 ? (
-            <DesignGrid designs={filteredDesigns} />
+            <DesignGrid designs={filteredDesigns} priorityCount={4} />
           ) : (
             <div className="rounded-[2rem] border border-dashed border-[color:var(--line)] px-6 py-12 text-center">
               <h2 className="font-display text-3xl text-[color:var(--text-primary)]">

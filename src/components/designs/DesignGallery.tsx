@@ -64,6 +64,7 @@ export function DesignGallery({ design }: { design: Design }) {
                   src={activeView.image}
                   alt={localizeText(language, design.name)}
                   fill
+                  priority={activeIndex === 0}
                   className="detail-gallery__media"
                   style={{ objectPosition: activeView.objectPosition }}
                   sizes="(max-width: 768px) 100vw, 50vw"

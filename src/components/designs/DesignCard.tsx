@@ -11,9 +11,10 @@ import { localizeText } from '@/src/data/designs';
 
 type DesignCardProps = {
   design: Design;
+  priority?: boolean;
 };
 
-export function DesignCard({ design }: DesignCardProps) {
+export function DesignCard({ design, priority = false }: DesignCardProps) {
   const { language } = useSitePreferencesContext();
   const { isFavorite, toggleFavorite } = useFavoritesContext();
   const saved = isFavorite(design.id);
@@ -61,6 +62,7 @@ export function DesignCard({ design }: DesignCardProps) {
               src={design.coverImage}
               alt={localizeText(language, design.name)}
               fill
+              priority={priority}
               className="design-card__media transition duration-500 group-hover:scale-[1.015]"
               style={{ objectPosition: design.coverImagePosition ?? 'center top' }}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
