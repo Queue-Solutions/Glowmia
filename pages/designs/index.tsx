@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import Head from 'next/head';
-import type { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { Search } from 'lucide-react';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { DesignGrid } from '@/src/components/designs/DesignGrid';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
 import { localizeText, type Design } from '@/src/data/designs';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
-import { getAllDesignsFromSupabase, PUBLIC_PAGE_CACHE_CONTROL } from '@/src/services/dresses';
+import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 
 type FilterKey = 'all' | 'evening' | 'casual' | 'formal' | 'new';
 
@@ -17,18 +17,18 @@ type DesignsPageProps = {
 
 const filterOrder: FilterKey[] = ['all', 'evening', 'casual', 'formal', 'new'];
 
-export const getServerSideProps: GetServerSideProps<DesignsPageProps> = async ({ res }) => {
-  res.setHeader('Cache-Control', PUBLIC_PAGE_CACHE_CONTROL);
+export const getStaticProps: GetStaticProps<DesignsPageProps> = async () => {
   const designs = await getAllDesignsFromSupabase();
 
   return {
     props: {
       designs,
     },
+    revalidate: 60,
   };
 };
 
-export default function DesignsPage({ designs }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+export default function DesignsPage({ designs }: InferGetStaticPropsType<typeof getStaticProps>) {
   const { language } = useSitePreferencesContext();
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [query, setQuery] = useState('');

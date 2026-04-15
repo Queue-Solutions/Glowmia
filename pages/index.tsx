@@ -1,36 +1,36 @@
 import Head from 'next/head';
-import type { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { HomeHero } from '@/src/components/site/HomeHero';
 import { BrandIntro } from '@/src/components/site/BrandIntro';
 import { FeaturedDesigns } from '@/src/components/designs/FeaturedDesigns';
 import { AgentTeaser } from '@/src/components/site/AgentTeaser';
 import { getFeaturedDesignsFromList, type Design } from '@/src/data/designs';
-import { getAllDesignsFromSupabase, PUBLIC_PAGE_CACHE_CONTROL } from '@/src/services/dresses';
+import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 
 type HomePageProps = {
   featuredDesigns: Design[];
 };
 
-export const getServerSideProps: GetServerSideProps<HomePageProps> = async ({ res }) => {
-  res.setHeader('Cache-Control', PUBLIC_PAGE_CACHE_CONTROL);
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
   const designs = await getAllDesignsFromSupabase();
 
   return {
     props: {
       featuredDesigns: getFeaturedDesignsFromList(designs),
     },
+    revalidate: 60,
   };
 };
 
-export default function HomePage({ featuredDesigns }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+export default function HomePage({ featuredDesigns }: InferGetStaticPropsType<typeof getStaticProps>) {
   return (
     <>
       <Head>
         <title>Glowmia</title>
         <meta
           name="description"
-          content="Glowmia is a premium fashion portfolio showcasing refined dress designs, mood-led storytelling, and an upcoming AI styling experience."
+          content="Glowmia is a premium fashion destination for refined dress designs, mood-led storytelling, and a live AI styling experience."
         />
       </Head>
 

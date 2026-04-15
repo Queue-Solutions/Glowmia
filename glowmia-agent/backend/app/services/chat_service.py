@@ -36,6 +36,24 @@ def add_message(data: Dict[str, Any]) -> None:
     }).eq("id", data["session_id"]).execute()
 
 
+def format_recommendation_dress(dress: Dict[str, Any]) -> Dict[str, Any]:
+    """Format a dress for recommendations by using cover image for display."""
+    # Create a copy to avoid modifying the original
+    formatted = dict(dress)
+    
+    # Store the original full image as detail_image_url for editing (fallback to current image_url)
+    if "image_url" in formatted and formatted.get("image_url"):
+        # If we have a separate detail image already, preserve it; otherwise use image_url as the detail
+        if "detail_image_url" not in formatted or not formatted.get("detail_image_url"):
+            formatted["detail_image_url"] = formatted["image_url"]
+    
+    # Use cover_image_url for display ( with fallback to image_url if cover doesn't exist)
+    if formatted.get("cover_image_url"):
+        formatted["image_url"] = formatted["cover_image_url"]
+    
+    return formatted
+
+
 def recommend_in_session(session_id: str, query: str) -> Dict[str, Any]:
     dresses = fetch_all_dresses()
 
@@ -44,6 +62,9 @@ def recommend_in_session(session_id: str, query: str) -> Dict[str, Any]:
         prefs = extract_preferences(query)
 
     results = recommend_dresses(dresses, prefs)
+    
+    # Format results to use cover images for display
+    formatted_results = [format_recommendation_dress(dress) for dress in results]
 
     add_message({
         "session_id": session_id,
@@ -58,14 +79,14 @@ def recommend_in_session(session_id: str, query: str) -> Dict[str, Any]:
         "message_type": "recommend_result",
         "parsed_data": prefs,
         "metadata": {
-            "results": results
+            "results": formatted_results
         }
     })
 
     return {
         "query": query,
         "parsed_preferences": prefs,
-        "results": results
+        "results": formatted_results
     }
 
 

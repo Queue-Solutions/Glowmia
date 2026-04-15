@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { ensureGlowmiaAgentBackend } from '@/src/lib/glowmiaAgentRuntime';
 
 const AGENT_API_BASE_URL = (process.env.GLOWMIA_AGENT_API_URL || process.env.NEXT_PUBLIC_GLOWMIA_AGENT_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
@@ -35,6 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
 
   try {
+    await ensureGlowmiaAgentBackend(AGENT_API_BASE_URL);
+
     if (action === 'session') {
       const title = readString(req.body?.title) || 'Glowmia Stylist Session';
       const { status, data } = await readBackendJson('/chat/sessions', { title });
@@ -74,10 +77,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     return res.status(404).json({ detail: 'Unknown agent action' });
   } catch (error) {
-    console.error('Glowmia agent proxy failed', error);
+    console.error('Glowmia agent proxy failed:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
 
     return res.status(502).json({
-      detail: 'Glowmia stylist is unavailable right now. Make sure the agent backend is running.',
+      detail: `Glowmia stylist is unavailable right now. Backend target: ${AGENT_API_BASE_URL}. ${errorMsg}`,
     });
   }
 }

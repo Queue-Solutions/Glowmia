@@ -8,6 +8,8 @@ export type AgentDress = {
   id: string;
   name: string;
   image_url: string;
+  detail_image_url?: string | null;
+  cover_image_url?: string | null;
   category?: string | null;
   occasion?: string[] | string | null;
   color?: string | null;

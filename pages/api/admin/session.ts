@@ -21,6 +21,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
   }
 
   if (!isAdminConfigured()) {
+    console.error('[Admin Session] Admin not configured - missing env vars');
     response.status(503).json({
       error: 'Admin credentials are not configured yet. Add ADMIN_USERNAME, ADMIN_PASSWORD_HASH, and ADMIN_SESSION_SECRET.',
     });
@@ -30,12 +31,16 @@ export default async function handler(request: NextApiRequest, response: NextApi
   const username = typeof request.body?.username === 'string' ? request.body.username.trim() : '';
   const password = typeof request.body?.password === 'string' ? request.body.password : '';
 
+  console.log('[Admin Session] Login attempt for username:', username);
+
   if (!verifyAdminCredentials(username, password)) {
+    console.error('[Admin Session] Invalid credentials for username:', username);
     await wait(450);
     response.status(401).json({ error: 'Invalid username or password.' });
     return;
   }
 
+  console.log('[Admin Session] Successfully authenticated:', username);
   setAdminSessionCookie(response, username);
   response.status(200).json({ ok: true });
 }

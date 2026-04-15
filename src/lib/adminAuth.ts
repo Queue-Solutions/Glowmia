@@ -120,11 +120,19 @@ function readSessionPayload(token: string, secret: string) {
 }
 
 export function getAdminConfig() {
-  return {
+  const config = {
     username: process.env.ADMIN_USERNAME?.trim() || '',
     passwordHash: process.env.ADMIN_PASSWORD_HASH?.trim() || '',
     sessionSecret: process.env.ADMIN_SESSION_SECRET?.trim() || '',
   };
+  
+  console.log('[Admin Config] Loaded:', {
+    username: config.username ? 'SET' : 'MISSING',
+    passwordHash: config.passwordHash ? `SET (length: ${config.passwordHash.length})` : 'MISSING',
+    sessionSecret: config.sessionSecret ? 'SET' : 'MISSING',
+  });
+  
+  return config;
 }
 
 export function isAdminConfigured() {
@@ -142,6 +150,7 @@ export function verifyAdminPassword(password: string, storedHash: string) {
   const [algorithm, salt, expectedHash] = storedHash.split('$');
 
   if (algorithm !== 'scrypt' || !salt || !expectedHash) {
+    console.error('[Admin Auth] Invalid hash format - algorithm:', algorithm, 'salt:', !!salt, 'hash:', !!expectedHash);
     return false;
   }
 
@@ -149,10 +158,13 @@ export function verifyAdminPassword(password: string, storedHash: string) {
   const derivedBuffer = scryptSync(password, salt, expectedBuffer.length);
 
   if (expectedBuffer.length !== derivedBuffer.length) {
+    console.error('[Admin Auth] Buffer length mismatch');
     return false;
   }
 
-  return timingSafeEqual(expectedBuffer, derivedBuffer);
+  const isMatch = timingSafeEqual(expectedBuffer, derivedBuffer);
+  console.log('[Admin Auth] Password verification:', isMatch ? 'PASS' : 'FAIL');
+  return isMatch;
 }
 
 export function verifyAdminCredentials(username: string, password: string) {

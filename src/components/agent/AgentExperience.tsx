@@ -2,7 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUpRight, Bot, CheckCircle2, Loader2, RotateCcw, Sparkles, Wand2 } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Bot,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Menu,
+  RotateCcw,
+  Sparkles,
+  Star,
+  Wand2,
+  X,
+} from 'lucide-react';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import {
   createAgentSession,
@@ -11,6 +24,7 @@ import {
   type AgentDress,
   type AgentEditResponse,
 } from '@/src/services/glowmiaAgent';
+import { submitAgentFeedback } from '@/src/services/engagement';
 
 type AgentMode = 'recommend' | 'edit';
 
@@ -37,49 +51,52 @@ type AgentEditMessage = {
 
 type AgentMessage = AgentTextMessage | AgentRecommendationMessage | AgentEditMessage;
 
-const agentPageCopy = {
+const suggestionsFooterByLanguage = {
+  en: {
+    title: 'Try me.',
+    text: 'Pick one suggestion or send a short note and I will start styling from there.',
+  },
+  ar: {
+    title: 'جرّبيني.',
+    text: 'اختاري أحد الاقتراحات أو ابدئي برسالة قصيرة وسأرتب لك الإطلالة من هنا.',
+  },
+} as const;
+
+const copyByLanguage = {
   en: {
     eyebrow: 'Glowmia Stylist',
-    title: 'Describe the dress mood you want, then refine it inside the same conversation.',
-    description:
-      'Glowmia Stylist helps with recommendations in English or Arabic, then keeps the selected look open for follow-up edits without leaving the page.',
-    liveBadge: 'Live styling flow',
-    liveTitle: 'One conversation from discovery to visual edit.',
-    liveDescription:
-      'Ask for an occasion, silhouette, or color story. When a look feels close, open it for edits like sleeve changes, color updates, or finish adjustments.',
-    promptTitle: 'Try a starting prompt',
-    promptDescription: 'Use a ready-made direction or write your own request below.',
     sessionTitle: 'Glowmia Website Session',
-    greeting:
-      "Hello, I'm your Glowmia stylist. Ask for a dress recommendation in English or Arabic, then choose a look to refine it here.",
+    greeting: "Try me. Let's create a dress that feels made for you.",
     connecting: 'Connecting stylist',
     connected: 'Stylist ready',
-    recommendationMode: 'Recommendation mode',
-    editMode: 'Edit mode',
-    howItWorksTitle: 'How it works',
-    howItWorksSteps: [
-      'Share the event, color, shape, or mood.',
-      'Review suggested dresses from the collection.',
-      'Select one look and request visual changes in the same thread.',
-    ],
-    selectedDressTitle: 'Selected for editing',
-    selectedDressDescription: 'Further edits will be applied to this look until you clear it.',
-    clearSelection: 'Cancel edit',
-    resetSession: 'Start new session',
+    recommendationMode: 'Recommendations',
+    editMode: 'Editing',
+    railTitle: 'Stylist workspace',
+    railDescription: 'Start with a mood, pin a look, then keep refining it in one thread.',
+    promptTitle: 'Start with a prompt',
+    promptDescription: 'Pick a suggestion or write your own request.',
+    historyTitle: 'Recent looks',
+    historyEmpty: 'Recommended looks from this session will appear here.',
+    selectedDressTitle: 'Pinned look',
+    selectedDressDescription: 'Your selected dress stays here while the chat continues.',
+    clearSelection: 'Clear selection',
+    newChat: 'New chat',
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
     composerPlaceholder: 'Ask for a dress recommendation...',
-    composerEditPlaceholder: 'Describe the edit you want to make...',
+    composerEditPlaceholder: 'Describe the change you want...',
     send: 'Send',
     sending: 'Sending...',
     applyEdit: 'Apply edit',
     recommendationsHeading: 'Recommended looks',
-    recommendationsDescription: 'Select a look to continue with refinements inside the conversation.',
+    recommendationsDescription: 'Choose a cover look, then continue refining the full dress inside the same chat.',
     noResults:
       "I couldn't find a close match for that request. Try adjusting the occasion, color, silhouette, or fabric.",
     editThisDress: 'Edit this look',
-    editingPickedDress: 'Ready for refinements',
+    editingPickedDress: 'Selected for edits',
     editNoImageReturned: 'The edit request finished, but no edited image was returned.',
     selectDressMessage: (dressName: string) =>
-      `Selected "${dressName}" for editing. You can now ask for changes like "make it burgundy" or "add long sleeves".`,
+      `Perfect. "${dressName}" is pinned now. Tell me what you want to change and I'll keep working on the full dress.`,
     editResultHeading: (dressName: string) => `Edited result for ${dressName}`,
     originalImage: 'Current look',
     editedImage: 'Updated look',
@@ -87,57 +104,68 @@ const agentPageCopy = {
     loadingMessage: 'Glowmia Stylist is working on it...',
     retryConnection: 'Retry connection',
     connectionError: 'Unable to reach the stylist service right now.',
-    emptyEditStateTitle: 'Pick a look to edit',
-    emptyEditStateDescription: 'Recommendations you select will stay here while you keep refining them.',
+    emptyEditStateTitle: 'Pick a look to shape',
+    emptyEditStateDescription:
+      'Once you choose a recommendation, the full dress appears here for edits and follow-up changes.',
     resultMetaFallback: 'Signature dress',
+    openRail: 'Open stylist sidebar',
+    closeRail: 'Close stylist sidebar',
+    introTitle: 'Create a look with Glowmia',
+    introDescription:
+      'Describe the event, the silhouette, or the mood you want. I will suggest cover looks from the collection and keep the selected dress ready for edits.',
     suggestions: [
       'I need an elegant evening dress in black for a formal dinner.',
       'Show me a soft gold dress for an engagement celebration.',
       'I want a modest silhouette with long sleeves for an evening event.',
     ],
     editSuggestions: ['Make it deep burgundy.', 'Add long sleeves.', 'Give it a more fitted silhouette.'],
+    howItWorksTitle: 'How it works',
+    howItWorksSteps: [
+      'Describe the occasion, color, fit, or feeling you want.',
+      'Review the recommended cover looks from the collection.',
+      'Choose one look and continue editing the full dress in the same thread.',
+    ],
+    feedbackTitle: 'How was Glowmia Stylist?',
+    feedbackDescription: 'Rate this session and leave a quick note for the team.',
+    feedbackPlaceholder: 'Anything you want us to improve?',
+    feedbackSubmit: 'Send feedback',
+    feedbackThanks: 'Thank you. Your feedback is saved.',
+    feedbackHint: 'Choose up to five stars.',
+    feedbackError: 'Unable to save your feedback right now.',
   },
   ar: {
     eyebrow: 'Glowmia Stylist',
-    title: 'صفي الإطلالة التي تريدينها ثم كمّلي التعديل داخل نفس المحادثة.',
-    description:
-      'يساعدك Glowmia Stylist في ترشيح الفساتين بالعربية أو الإنجليزية، ثم يترك التصميم المختار جاهزاً للتعديلات اللاحقة داخل الصفحة نفسها.',
-    liveBadge: 'تجربة تنسيق مباشرة',
-    liveTitle: 'محادثة واحدة من الاكتشاف إلى التعديل البصري.',
-    liveDescription:
-      'اطلبي المناسبة أو القصة اللونية أو القصة العامة للفستان. وعندما يقترب الترشيح من ذوقك، افتحيه للتعديل مثل تغيير اللون أو الأكمام أو اللمسة النهائية.',
-    promptTitle: 'ابدئي من اقتراح جاهز',
-    promptDescription: 'اختاري اتجاهاً سريعاً أو اكتبي طلبك الخاص في الأسفل.',
-    sessionTitle: 'جلسة Glowmia في الموقع',
-    greeting:
-      'مرحباً، أنا منسقة Glowmia. اطلبي ترشيح فستان بالعربية أو الإنجليزية، ثم اختاري التصميم الذي تريدين تعديله داخل هذه المحادثة.',
+    sessionTitle: 'جلسة Glowmia داخل الموقع',
+    greeting: 'جرّبيني. لنصمم معًا فستانًا مميزًا يليق بك.',
     connecting: 'جارٍ تجهيز المنسقة',
     connected: 'المنسقة جاهزة',
-    recommendationMode: 'وضع الترشيح',
-    editMode: 'وضع التعديل',
-    howItWorksTitle: 'كيف تعمل التجربة',
-    howItWorksSteps: [
-      'اذكري المناسبة أو اللون أو القصة أو المزاج العام.',
-      'استعرضي الفساتين المقترحة من المجموعة.',
-      'اختاري فستاناً واحداً واطلبي تعديلات بصرية داخل نفس المحادثة.',
-    ],
-    selectedDressTitle: 'الفستان المختار للتعديل',
-    selectedDressDescription: 'ستُطبَّق التعديلات التالية على هذا التصميم حتى تقومي بإلغاء الاختيار.',
-    clearSelection: 'إلغاء التعديل',
-    resetSession: 'بدء جلسة جديدة',
+    recommendationMode: 'الترشيحات',
+    editMode: 'التعديل',
+    railTitle: 'مساحة المنسقة',
+    railDescription: 'ابدئي بالمزاج أو المناسبة، ثبتي الإطلالة التي تعجبك، ثم كمّلي التعديل داخل نفس المحادثة.',
+    promptTitle: 'ابدئي من هنا',
+    promptDescription: 'اختاري اقتراحًا سريعًا أو اكتبي طلبك بطريقتك.',
+    historyTitle: 'آخر الإطلالات',
+    historyEmpty: 'ستظهر هنا الإطلالات المقترحة من هذه الجلسة.',
+    selectedDressTitle: 'الإطلالة المثبتة',
+    selectedDressDescription: 'يبقى الفستان المختار هنا بينما تتابعين المحادثة على الجهة الأخرى.',
+    clearSelection: 'إلغاء التثبيت',
+    newChat: 'محادثة جديدة',
+    collapseSidebar: 'تصغير الشريط الجانبي',
+    expandSidebar: 'توسيع الشريط الجانبي',
     composerPlaceholder: 'اطلبي ترشيح فستان...',
     composerEditPlaceholder: 'صفي التعديل الذي تريدينه...',
     send: 'إرسال',
     sending: 'جارٍ الإرسال...',
     applyEdit: 'تنفيذ التعديل',
     recommendationsHeading: 'الترشيحات المقترحة',
-    recommendationsDescription: 'اختاري التصميم الأنسب ثم تابعي التعديلات داخل نفس المحادثة.',
-    noResults: 'لم أجد فستاناً قريباً من هذا الطلب. جربي تعديل المناسبة أو اللون أو القصة أو الخامة.',
-    editThisDress: 'تعديل هذا التصميم',
-    editingPickedDress: 'جاهز للتعديلات',
-    editNoImageReturned: 'اكتمل طلب التعديل لكن لم يتم إرجاع صورة جديدة.',
+    recommendationsDescription: 'اختاري صورة الغلاف أولًا، ثم واصلي تعديل الفستان الكامل داخل نفس المحادثة.',
+    noResults: 'لم أجد فستانًا قريبًا من هذا الطلب. جرّبي تعديل المناسبة أو اللون أو القصة أو الخامة.',
+    editThisDress: 'تعديل هذه الإطلالة',
+    editingPickedDress: 'مختار للتعديلات',
+    editNoImageReturned: 'اكتمل طلب التعديل لكن لم يتم إرجاع صورة معدلة.',
     selectDressMessage: (dressName: string) =>
-      `تم اختيار "${dressName}" للتعديل. يمكنك الآن طلب تغييرات مثل "اجعليه خمرياً" أو "أضيفي أكماماً طويلة".`,
+      `ممتاز. تم تثبيت "${dressName}" الآن. اذكري التعديلات التي تريدينها وسأكمل العمل على الفستان الكامل.`,
     editResultHeading: (dressName: string) => `النتيجة المعدلة لـ ${dressName}`,
     originalImage: 'الإطلالة الحالية',
     editedImage: 'الإطلالة بعد التعديل',
@@ -145,15 +173,33 @@ const agentPageCopy = {
     loadingMessage: 'Glowmia Stylist يعمل الآن...',
     retryConnection: 'إعادة المحاولة',
     connectionError: 'تعذر الوصول إلى خدمة المنسقة الآن.',
-    emptyEditStateTitle: 'اختاري تصميماً للتعديل',
-    emptyEditStateDescription: 'أي تصميم تختارينه من الترشيحات سيبقى هنا لتكملي عليه التعديلات.',
+    emptyEditStateTitle: 'اختاري إطلالة لنبدأ بها',
+    emptyEditStateDescription: 'بعد اختيار أحد الترشيحات سيظهر الفستان الكامل هنا لتكملي عليه التعديلات والمتابعة.',
     resultMetaFallback: 'فستان مميز',
+    openRail: 'فتح الشريط الجانبي',
+    closeRail: 'إغلاق الشريط الجانبي',
+    introTitle: 'اصنعي إطلالتك مع Glowmia',
+    introDescription:
+      'صفي المناسبة أو القصة أو الإحساس الذي تريدينه. سأقترح عليك صور غلاف من المجموعة وأبقي الفستان المختار جاهزًا للتعديل.',
     suggestions: [
-      'أريد فستاناً أسود أنيقاً لعشاء رسمي.',
-      'اعرضي لي فستاناً ذهبياً ناعماً لحفل خطوبة.',
+      'أريد فستانًا أسود أنيقًا لعشاء رسمي.',
+      'اعرضي لي فستانًا ذهبيًا ناعمًا لحفل خطوبة.',
       'أريد قصة محتشمة بأكمام طويلة لمناسبة مسائية.',
     ],
-    editSuggestions: ['اجعليه خمرياً.', 'أضيفي أكماماً طويلة.', 'اجعلي القصة أكثر تحديداً.'],
+    editSuggestions: ['اجعليه خمريًا.', 'أضيفي أكمامًا طويلة.', 'اجعلي القصة أكثر تحديدًا.'],
+    howItWorksTitle: 'كيف تعمل التجربة',
+    howItWorksSteps: [
+      'اذكري المناسبة أو اللون أو القصة أو الإحساس الذي تريدينه.',
+      'استعرضي صور الغلاف المقترحة من المجموعة.',
+      'اختاري تصميمًا واحدًا ثم واصلي تعديل الفستان الكامل داخل نفس المحادثة.',
+    ],
+    feedbackTitle: 'كيف كانت تجربة Glowmia Stylist؟',
+    feedbackDescription: 'قيّمي الجلسة واتركي ملاحظة سريعة للفريق.',
+    feedbackPlaceholder: 'هل هناك شيء تريدين تحسينه؟',
+    feedbackSubmit: 'إرسال التقييم',
+    feedbackThanks: 'شكرًا لك. تم حفظ رأيك.',
+    feedbackHint: 'اختاري حتى خمس نجوم.',
+    feedbackError: 'تعذر حفظ رأيك الآن.',
   },
 } as const;
 
@@ -167,6 +213,7 @@ function normalizeText(value: string | string[] | null | undefined, fallback = '
       .map((entry) => entry.trim())
       .filter(Boolean)
       .join(', ');
+
     return joined || fallback;
   }
 
@@ -226,9 +273,17 @@ function formatParsedEditValue(value: unknown) {
   return JSON.stringify(value);
 }
 
+function getRecommendationImageUrl(dress: AgentDress) {
+  return dress.cover_image_url || dress.image_url;
+}
+
+function getEditingImageUrl(dress: AgentDress) {
+  return dress.detail_image_url || dress.image_url;
+}
+
 export function AgentExperience() {
   const { language } = useSitePreferencesContext();
-  const copy = agentPageCopy[language];
+  const copy = copyByLanguage[language];
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -238,21 +293,66 @@ export function AgentExperience() {
   const [selectedDress, setSelectedDress] = useState<AgentDress | null>(null);
   const [mode, setMode] = useState<AgentMode>('recommend');
   const [error, setError] = useState('');
-
+  const [mobileRailOpen, setMobileRailOpen] = useState(false);
+  const [agentRating, setAgentRating] = useState(0);
+  const [hoveredAgentRating, setHoveredAgentRating] = useState(0);
+  const [agentFeedback, setAgentFeedback] = useState('');
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const previousLanguageRef = useRef(language);
+  const suggestionsFooter = suggestionsFooterByLanguage[language];
 
   const activeSuggestions = useMemo(
     () => (mode === 'edit' && selectedDress ? copy.editSuggestions : copy.suggestions),
     [copy.editSuggestions, copy.suggestions, mode, selectedDress],
   );
 
+  const historyItems = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          messages
+            .filter((message) => message.type === 'recommend' && message.role === 'assistant')
+            .flatMap((message) => (message.type === 'recommend' ? message.data : []))
+            .map((dress) => [dress.id, dress]),
+        ).values(),
+      ).slice(0, 8),
+    [messages],
+  );
+  const canLeaveFeedback = useMemo(
+    () => messages.some((message) => message.type === 'recommend' || message.type === 'edit'),
+    [messages],
+  );
+  const activeAgentRating = hoveredAgentRating || agentRating;
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, loading, selectedDress, error]);
+  }, [messages, loading, error]);
+
+  useEffect(() => {
+    const element = composerRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    element.style.height = '0px';
+    element.style.height = `${Math.min(element.scrollHeight, 176)}px`;
+  }, [input, language, mode, selectedDress]);
 
   useEffect(() => {
     void initializeSession();
   }, []);
+
+  useEffect(() => {
+    if (previousLanguageRef.current === language) {
+      return;
+    }
+
+    previousLanguageRef.current = language;
+    void initializeSession();
+  }, [language]);
 
   async function initializeSession() {
     setBootstrapping(true);
@@ -260,6 +360,11 @@ export function AgentExperience() {
     setSelectedDress(null);
     setMode('recommend');
     setInput('');
+    setMobileRailOpen(false);
+    setAgentRating(0);
+    setHoveredAgentRating(0);
+    setAgentFeedback('');
+    setFeedbackState('idle');
 
     try {
       const session = await createAgentSession(copy.sessionTitle);
@@ -288,9 +393,11 @@ export function AgentExperience() {
 
   function handleSelectDressForEdit(dress: AgentDress) {
     const dressName = localizeDressName(dress, language);
+
     setSelectedDress(dress);
     setMode('edit');
     setError('');
+    setMobileRailOpen(false);
 
     appendMessage({
       id: createMessageId(),
@@ -303,6 +410,7 @@ export function AgentExperience() {
   function handleClearSelection() {
     setSelectedDress(null);
     setMode('recommend');
+    setMobileRailOpen(false);
   }
 
   async function handleSend() {
@@ -327,7 +435,7 @@ export function AgentExperience() {
       if (mode === 'edit' && selectedDress) {
         const response = await requestAgentEdit(sessionId, {
           dressId: selectedDress.id,
-          imageUrl: selectedDress.image_url,
+          imageUrl: getEditingImageUrl(selectedDress),
           instruction: trimmed,
         });
 
@@ -393,192 +501,347 @@ export function AgentExperience() {
     }
   }
 
+  function handlePromptClick(prompt: string) {
+    setInput(prompt);
+    setMobileRailOpen(false);
+  }
+
+  async function handleSubmitSessionFeedback() {
+    if (!canLeaveFeedback || agentRating < 1 || feedbackState === 'saving') {
+      return;
+    }
+
+    setFeedbackState('saving');
+
+    try {
+      await submitAgentFeedback({
+        sessionId,
+        language,
+        rating: agentRating,
+        message: agentFeedback,
+      });
+      setFeedbackState('saved');
+    } catch {
+      setFeedbackState('error');
+    }
+  }
+
+  const showEmptyIntro = messages.length <= 1 && !loading;
+
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-10 md:px-10">
-      <div className="agent-page-shell">
-        <motion.div
-          className="agent-page-intro"
-          initial={{ opacity: 0, y: 16 }}
+    <section className="mx-auto w-full max-w-7xl px-5 pb-10 md:px-10">
+      <div className="agent-shell">
+        <motion.header
+          className="agent-shell__hero text-center"
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="space-y-5">
-            <span className="eyebrow-chip">
-              <Sparkles className="h-4 w-4" />
-              {copy.eyebrow}
-            </span>
-
-            <div className="space-y-4">
-              <h1 className="max-w-3xl font-display text-5xl leading-[0.94] tracking-[-0.04em] text-[color:var(--text-primary)] md:text-6xl">
-                {copy.title}
-              </h1>
-              <p className="max-w-2xl text-lg leading-8 text-[color:var(--text-muted)]">{copy.description}</p>
-            </div>
-          </div>
-
-          <div className="agent-intro-note">
-            <span className="agent-intro-note__badge">{copy.liveBadge}</span>
-            <h2 className="font-display text-3xl leading-tight text-[color:var(--text-primary)]">{copy.liveTitle}</h2>
-            <p className="text-base leading-7 text-[color:var(--text-muted)]">{copy.liveDescription}</p>
-          </div>
-        </motion.div>
+          <span className="eyebrow-chip">
+            <Sparkles className="h-4 w-4" />
+            {copy.eyebrow}
+          </span>
+        </motion.header>
 
         <motion.div
-          className="agent-workspace"
-          initial={{ opacity: 0, y: 22 }}
+          className="agent-console"
+          initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.34, delay: 0.04, ease: [0.22, 1, 0.36, 1] }}
         >
-          <aside className="agent-sidebar">
-            <section className="agent-sidebar-block">
-              <div className="agent-sidebar-block__header">
-                <h2>{copy.promptTitle}</h2>
-                <p>{copy.promptDescription}</p>
-              </div>
+          <button
+            type="button"
+            className={`agent-mobile-rail-backdrop ${mobileRailOpen ? 'is-open' : ''}`}
+            onClick={() => setMobileRailOpen(false)}
+            aria-hidden={!mobileRailOpen}
+            tabIndex={mobileRailOpen ? 0 : -1}
+          />
 
-              <div className="agent-prompt-list">
-                {activeSuggestions.map((prompt) => (
-                  <button key={prompt} type="button" className="agent-prompt-chip" onClick={() => setInput(prompt)}>
-                    <ArrowUpRight className="h-4 w-4 shrink-0" />
-                    <span>{prompt}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="agent-sidebar-block">
-              <div className="agent-sidebar-block__header">
-                <h2>{copy.howItWorksTitle}</h2>
-              </div>
-
-              <ol className="agent-steps">
-                {copy.howItWorksSteps.map((step) => (
-                  <li key={step} className="agent-step">
-                    <span className="agent-step__icon">
-                      <CheckCircle2 className="h-4 w-4" />
-                    </span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-
-            <section className="agent-sidebar-block">
-              {selectedDress ? (
-                <div className="agent-selected-dress">
-                  <div className="agent-sidebar-block__header">
-                    <h2>{copy.selectedDressTitle}</h2>
-                    <p>{copy.selectedDressDescription}</p>
-                  </div>
-
-                  <div className="agent-selected-dress__card">
-                    <img
-                      src={selectedDress.image_url}
-                      alt={localizeDressName(selectedDress, language)}
-                      className="agent-selected-dress__image"
-                    />
-
-                    <div className="space-y-3">
-                      <div>
-                        <p className="agent-selected-dress__label">{copy.editingPickedDress}</p>
-                        <h3 className="agent-selected-dress__name">{localizeDressName(selectedDress, language)}</h3>
-                      </div>
-
-                      <div className="agent-inline-tags">
-                        {buildDressMeta(selectedDress, language).map((item) => (
-                          <span key={item} className="agent-inline-tag">
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button type="button" className="secondary-button w-full" onClick={handleClearSelection}>
-                    {copy.clearSelection}
-                  </button>
-                </div>
-              ) : (
-                <div className="agent-empty-edit-state">
-                  <Wand2 className="h-5 w-5" />
-                  <div className="space-y-2">
-                    <h3>{copy.emptyEditStateTitle}</h3>
-                    <p>{copy.emptyEditStateDescription}</p>
-                  </div>
-                </div>
-              )}
-            </section>
-          </aside>
-
-          <div className="agent-chat-panel">
-            <div className="agent-chat-panel__header">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="agent-avatar">
-                    <Bot className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h2 className="font-display text-3xl leading-none text-[color:var(--text-primary)]">Glowmia Stylist</h2>
-                  </div>
-                </div>
-              </div>
-
-              <div className="agent-status-list">
-                <span className={`agent-status-pill ${sessionId && !bootstrapping ? 'agent-status-pill--ready' : ''}`}>
-                  {bootstrapping ? copy.connecting : copy.connected}
+          <aside className={`agent-console__rail ${mobileRailOpen ? 'is-open' : ''}`}>
+            <div className="agent-console__rail-head">
+              <div className="agent-console__brand">
+                <span className="agent-console__brand-mark" aria-hidden="true">
+                  <Sparkles className="h-4 w-4" />
                 </span>
-                <span className="agent-status-pill">{mode === 'edit' ? copy.editMode : copy.recommendationMode}</span>
-                <button type="button" className="agent-reset-button" onClick={() => void initializeSession()} disabled={loading || bootstrapping}>
+
+                <div className="agent-console__brand-copy">
+                  <span className="agent-console__brand-text font-display">Glowmia</span>
+                  <span className="agent-console__brand-subtitle">{copy.railTitle}</span>
+                </div>
+              </div>
+
+              <div className="agent-console__rail-actions">
+                <button
+                  type="button"
+                  className="agent-console__icon-button agent-console__icon-button--mobile"
+                  onClick={() => setMobileRailOpen(false)}
+                  aria-label={copy.closeRail}
+                  title={copy.closeRail}
+                >
+                  {language === 'ar'
+                    ? <ChevronRight className="h-4 w-4" />
+                    : <ChevronLeft className="h-4 w-4" />}
+                </button>
+
+                <button
+                  type="button"
+                  className="agent-console__icon-button"
+                  onClick={() => void initializeSession()}
+                  disabled={loading || bootstrapping}
+                  aria-label={copy.newChat}
+                  title={copy.newChat}
+                >
                   <RotateCcw className="h-4 w-4" />
-                  <span>{copy.resetSession}</span>
                 </button>
               </div>
             </div>
 
+              <>
+                <section className="agent-console__section agent-console__section--intro">
+                  <div className="agent-console__status-row">
+                    <span className={`agent-console__badge ${sessionId && !bootstrapping ? 'agent-console__badge--ready' : ''}`}>
+                      {bootstrapping ? copy.connecting : copy.connected}
+                    </span>
+                    <span className="agent-console__badge">{mode === 'edit' ? copy.editMode : copy.recommendationMode}</span>
+                  </div>
+
+                  <div className="agent-console__headline">
+                    <h2>{copy.introTitle}</h2>
+                    <p>{copy.introDescription}</p>
+                  </div>
+                </section>
+
+                <section className="agent-console__section">
+                  <div className="agent-console__section-head">
+                    <h2>{copy.promptTitle}</h2>
+                  </div>
+                  <p className="agent-console__section-copy">{copy.promptDescription}</p>
+
+                  <div className="agent-prompt-list">
+                    {activeSuggestions.map((prompt) => (
+                      <button key={prompt} type="button" className="agent-prompt" onClick={() => handlePromptClick(prompt)}>
+                        <ArrowUpRight className="h-4 w-4 shrink-0" />
+                        <span>{prompt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="agent-console__section">
+                  <div className="agent-console__section-head">
+                    <h2>{copy.historyTitle}</h2>
+                  </div>
+
+                  {historyItems.length > 0 ? (
+                    <ul className="agent-chat-history__list">
+                      {historyItems.map((dress) => (
+                        <li key={dress.id}>
+                          <button
+                            type="button"
+                            className={`agent-chat-history__item ${selectedDress?.id === dress.id ? 'agent-chat-history__item--active' : ''}`}
+                            onClick={() => handleSelectDressForEdit(dress)}
+                            title={localizeDressName(dress, language)}
+                          >
+                            <span className="agent-chat-history__item-text">{localizeDressName(dress, language)}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="agent-console__mini-empty">
+                      <p>{copy.historyEmpty}</p>
+                    </div>
+                  )}
+                </section>
+
+                <section className="agent-console__section">
+                  <div className="agent-console__section-head">
+                    <h2>{copy.selectedDressTitle}</h2>
+                    {selectedDress ? (
+                      <button type="button" className="agent-console__ghost" onClick={handleClearSelection}>
+                        {copy.clearSelection}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {selectedDress ? (
+                    <div className="agent-current-look">
+                      <img
+                        src={getEditingImageUrl(selectedDress)}
+                        alt={localizeDressName(selectedDress, language)}
+                        className="agent-current-look__image"
+                      />
+
+                      <div className="space-y-3">
+                        <div>
+                          <p className="agent-current-look__label">{copy.editingPickedDress}</p>
+                          <h3 className="agent-current-look__title">{localizeDressName(selectedDress, language)}</h3>
+                          <p className="agent-current-look__description">{copy.selectedDressDescription}</p>
+                        </div>
+
+                        <div className="agent-tag-list">
+                          {buildDressMeta(selectedDress, language).map((item) => (
+                            <span key={item} className="agent-tag">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="agent-empty-state">
+                      <Wand2 className="h-5 w-5" />
+                      <div className="space-y-2">
+                        <h3>{copy.emptyEditStateTitle}</h3>
+                        <p>{copy.emptyEditStateDescription}</p>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section className="agent-console__section">
+                  <div className="agent-console__section-head">
+                    <h2>{copy.howItWorksTitle}</h2>
+                  </div>
+
+                  <ol className="agent-step-list">
+                    {copy.howItWorksSteps.map((step) => (
+                      <li key={step} className="agent-step-item">
+                        <span className="agent-step-item__icon">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              </>
+          </aside>
+
+          <div className="agent-console__chat">
+            <header className="agent-chat-head">
+              <div className="agent-chat-head__identity">
+                <button
+                  type="button"
+                  className="agent-chat-head__rail-toggle"
+                  onClick={() => setMobileRailOpen((current) => !current)}
+                  aria-label={mobileRailOpen ? copy.closeRail : copy.openRail}
+                >
+                  {mobileRailOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                </button>
+
+                <span className="agent-chat-head__avatar">
+                  <Bot className="h-5 w-5" />
+                </span>
+
+                <div className="agent-chat-head__copy">
+                  <h2 className="font-display">Glowmia Stylist</h2>
+                  <p>{mode === 'edit' && selectedDress ? copy.selectedDressDescription : copy.recommendationsDescription}</p>
+                </div>
+              </div>
+
+              <div className="agent-chat-head__actions">
+                <span className="agent-chat-head__mode-pill">{mode === 'edit' ? copy.editMode : copy.recommendationMode}</span>
+                <button
+                  type="button"
+                  className="agent-chat-head__new-chat"
+                  onClick={() => void initializeSession()}
+                  disabled={loading || bootstrapping}
+                  title={copy.newChat}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+              </div>
+            </header>
+
             <div className="agent-chat-log no-scrollbar">
+              {showEmptyIntro ? (
+                <div className="agent-chat-suggestions">
+                  <div className="agent-chat-suggestions__content">
+                    <div className="agent-chat-suggestions__intro">
+                      <span className="agent-chat-suggestions__intro-badge">
+                        <Sparkles className="h-4 w-4" />
+                        {copy.eyebrow}
+                      </span>
+                      <h3>{copy.introTitle}</h3>
+                      <p>{copy.introDescription}</p>
+                    </div>
+
+                    <div className="agent-chat-suggestions__grid">
+                      {activeSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          className="agent-chat-suggestion-item"
+                          onClick={() => setInput(suggestion)}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          <span>{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="agent-chat-suggestions__footer">
+                      <strong>{suggestionsFooter.title}</strong>
+                      <p>{suggestionsFooter.text}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {messages.map((message) => {
                 const isUser = message.role === 'user';
+                const hideInEmptyState =
+                  showEmptyIntro &&
+                  message.role === 'assistant' &&
+                  message.type === 'text' &&
+                  message.text === copy.greeting;
+
+                if (hideInEmptyState) {
+                  return null;
+                }
 
                 return (
                   <div key={message.id} className={`agent-message-row ${isUser ? 'agent-message-row--user' : ''}`}>
                     {message.type === 'text' ? (
-                      <div className={`agent-message-bubble ${isUser ? 'agent-message-bubble--user' : 'agent-message-bubble--assistant'}`}>{message.text}</div>
+                      <div className={`agent-message-bubble ${isUser ? 'agent-message-bubble--user' : 'agent-message-bubble--assistant'}`}>
+                        {message.text}
+                      </div>
                     ) : null}
 
                     {message.type === 'recommend' ? (
-                      <div className="agent-rich-bubble">
-                        <div className="agent-rich-bubble__header">
-                          <span className="agent-rich-bubble__kicker">{copy.recommendationsHeading}</span>
+                      <div className="agent-message-panel">
+                        <div className="agent-message-panel__header">
+                          <span className="agent-message-panel__kicker">{copy.recommendationsHeading}</span>
                           <p>{copy.recommendationsDescription}</p>
                         </div>
 
-                        <div className="agent-results-grid">
+                        <div className="agent-card-grid">
                           {message.data.map((dress) => {
                             const dressName = localizeDressName(dress, language);
-                            const meta = buildDressMeta(dress, language);
                             const description = localizeDressDescription(dress, language);
+                            const meta = buildDressMeta(dress, language);
+                            const isSelected = selectedDress?.id === dress.id;
 
                             return (
-                              <article key={dress.id} className="agent-result-card">
-                                <div className="agent-result-card__image-frame">
-                                  <img src={dress.image_url} alt={dressName} className="agent-result-card__image" />
-                                </div>
+                              <article key={dress.id} className={`agent-card ${isSelected ? 'agent-card--selected' : ''}`}>
+                                <img src={getRecommendationImageUrl(dress)} alt={dressName} className="agent-card__image" />
 
-                                <div className="agent-result-card__body">
+                                <div className="agent-card__body">
                                   <div className="space-y-3">
                                     <div className="space-y-2">
-                                      <div className="agent-result-card__topline">
+                                      <div className="agent-card__topline">
                                         <h3>{dressName}</h3>
-                                        <span className="agent-result-card__category">{localizeDressCategory(dress, copy.resultMetaFallback)}</span>
+                                        <span className="agent-card__pill">{localizeDressCategory(dress, copy.resultMetaFallback)}</span>
                                       </div>
 
-                                      {description ? <p className="agent-result-card__description">{description}</p> : null}
+                                      {description ? <p className="agent-card__copy">{description}</p> : null}
                                     </div>
 
                                     {meta.length > 0 ? (
-                                      <div className="agent-inline-tags">
+                                      <div className="agent-tag-list">
                                         {meta.map((item) => (
-                                          <span key={item} className="agent-inline-tag">
+                                          <span key={item} className="agent-tag">
                                             {item}
                                           </span>
                                         ))}
@@ -598,34 +861,34 @@ export function AgentExperience() {
                     ) : null}
 
                     {message.type === 'edit' ? (
-                      <div className="agent-rich-bubble">
-                        <div className="agent-rich-bubble__header">
-                          <span className="agent-rich-bubble__kicker">{copy.editResultHeading(message.data.dressName)}</span>
+                      <div className="agent-message-panel">
+                        <div className="agent-message-panel__header">
+                          <span className="agent-message-panel__kicker">{copy.editResultHeading(message.data.dressName)}</span>
                           <p>{message.data.message}</p>
                         </div>
 
                         <div className="agent-edit-grid">
-                          <div className="agent-edit-image-card">
-                            <p className="agent-edit-image-card__label">{copy.originalImage}</p>
-                            <img src={message.data.original_image_url} alt={copy.originalImage} className="agent-edit-image-card__image" />
+                          <div className="agent-edit-card">
+                            <p className="agent-edit-card__label">{copy.originalImage}</p>
+                            <img src={message.data.original_image_url} alt={copy.originalImage} className="agent-edit-card__image" />
                           </div>
 
-                          <div className="agent-edit-image-card">
-                            <p className="agent-edit-image-card__label">{copy.editedImage}</p>
+                          <div className="agent-edit-card">
+                            <p className="agent-edit-card__label">{copy.editedImage}</p>
                             <img
                               src={message.data.edited_image_url || message.data.original_image_url}
                               alt={copy.editedImage}
-                              className="agent-edit-image-card__image"
+                              className="agent-edit-card__image"
                             />
                           </div>
                         </div>
 
                         {Object.keys(message.data.parsed_edits ?? {}).length > 0 ? (
                           <div className="space-y-3">
-                            <p className="agent-edit-image-card__label">{copy.appliedEdits}</p>
-                            <div className="agent-inline-tags">
+                            <p className="agent-edit-card__label">{copy.appliedEdits}</p>
+                            <div className="agent-tag-list">
                               {Object.entries(message.data.parsed_edits).map(([key, value]) => (
-                                <span key={key} className="agent-inline-tag">
+                                <span key={key} className="agent-tag">
                                   {key}: {formatParsedEditValue(value)}
                                 </span>
                               ))}
@@ -641,12 +904,12 @@ export function AgentExperience() {
               <AnimatePresence>
                 {loading ? (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    className="agent-loading-row"
+                    exit={{ opacity: 0, y: -6 }}
+                    className="agent-loading"
                   >
-                    <div className="agent-loading-pill">
+                    <div className="agent-loading__pill">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span>{copy.loadingMessage}</span>
                     </div>
@@ -658,7 +921,7 @@ export function AgentExperience() {
             </div>
 
             {error ? (
-              <div className="agent-error-banner">
+              <div className="agent-error">
                 <span>{error}</span>
                 <button type="button" className="secondary-button" onClick={() => void initializeSession()}>
                   {copy.retryConnection}
@@ -666,18 +929,101 @@ export function AgentExperience() {
               </div>
             ) : null}
 
+            {canLeaveFeedback ? (
+              <div className="agent-feedback-panel">
+                <div className="agent-feedback-panel__head">
+                  <div>
+                    <h3>{copy.feedbackTitle}</h3>
+                    <p>{copy.feedbackDescription}</p>
+                  </div>
+                  {feedbackState === 'saved' ? (
+                    <span className="agent-console__badge agent-console__badge--ready">{copy.feedbackThanks}</span>
+                  ) : null}
+                </div>
+
+                <div className="agent-feedback-panel__body">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-[color:var(--text-muted)]">{language === 'ar' ? 'التقييم' : 'Rating'}</span>
+                      <span className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{copy.feedbackHint}</span>
+                    </div>
+
+                    <div className="feedback-stars" onMouseLeave={() => setHoveredAgentRating(0)}>
+                      {Array.from({ length: 5 }, (_, index) => {
+                        const value = index + 1;
+                        const filled = value <= activeAgentRating;
+                        const isPerfect = activeAgentRating === 5 && value === 5;
+
+                        return (
+                          <button
+                            key={`agent-feedback-star-${value}`}
+                            type="button"
+                            onMouseEnter={() => setHoveredAgentRating(value)}
+                            onFocus={() => setHoveredAgentRating(value)}
+                            onClick={() => {
+                              setAgentRating(value);
+                              setFeedbackState('idle');
+                            }}
+                            className={`feedback-star-button ${filled ? 'feedback-star-button--active' : ''} ${isPerfect ? 'feedback-star-button--perfect' : ''}`}
+                            aria-label={`${value} ${language === 'ar' ? 'نجوم' : 'stars'}`}
+                          >
+                            <Star className={`h-6 w-6 ${filled ? 'fill-current' : ''}`} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="agent-feedback-panel__form">
+                    <input
+                      value={agentFeedback}
+                      onChange={(event) => {
+                        setAgentFeedback(event.target.value);
+                        setFeedbackState('idle');
+                      }}
+                      placeholder={copy.feedbackPlaceholder}
+                      className="field-input"
+                    />
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void handleSubmitSessionFeedback()}
+                      disabled={agentRating < 1 || feedbackState === 'saving'}
+                    >
+                      {feedbackState === 'saving'
+                        ? language === 'ar'
+                          ? 'جارٍ الحفظ...'
+                          : 'Saving...'
+                        : copy.feedbackSubmit}
+                    </button>
+                  </div>
+
+                  {feedbackState === 'error' ? <p className="agent-feedback-panel__error">{copy.feedbackError}</p> : null}
+                </div>
+              </div>
+            ) : null}
+
             <div className="agent-composer">
+              {selectedDress ? (
+                <div className="agent-composer__context">
+                  <span className="agent-composer__context-pill">{copy.editMode}</span>
+                  <span className="agent-composer__context-name">{localizeDressName(selectedDress, language)}</span>
+                </div>
+              ) : null}
+
               <label htmlFor="agent-composer-input" className="sr-only">
                 Glowmia Stylist input
               </label>
               <textarea
                 id="agent-composer-input"
+                ref={composerRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
                 placeholder={mode === 'edit' && selectedDress ? copy.composerEditPlaceholder : copy.composerPlaceholder}
                 className="agent-composer__input no-scrollbar"
-                rows={3}
+                rows={1}
               />
 
               <button

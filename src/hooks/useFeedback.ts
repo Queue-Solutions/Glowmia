@@ -1,59 +1,67 @@
 import { useEffect, useMemo, useState } from 'react';
-
-export type DesignFeedback = {
-  id: string;
-  designId: string;
-  author: string;
-  message: string;
-  rating: number;
-  createdAt: string;
-};
-
-const STORAGE_KEY = 'glowmia:design-feedback';
-
-function readFeedbackMap() {
-  if (typeof window === 'undefined') {
-    return {} as Record<string, DesignFeedback[]>;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, DesignFeedback[]>) : {};
-  } catch {
-    return {};
-  }
-}
+import { listDesignFeedback, submitDesignFeedback, type DesignFeedbackEntry } from '@/src/services/engagement';
 
 export function useFeedback(designId: string) {
-  const [feedbackMap, setFeedbackMap] = useState<Record<string, DesignFeedback[]>>({});
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, DesignFeedbackEntry[]>>({});
   const [hydrated, setHydrated] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setFeedbackMap(readFeedbackMap());
-    setHydrated(true);
-  }, []);
+    let active = true;
+
+    setHydrated(false);
+
+    void listDesignFeedback(designId)
+      .then((comments) => {
+        if (!active) {
+          return;
+        }
+
+        setFeedbackMap((current) => ({
+          ...current,
+          [designId]: comments,
+        }));
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        setFeedbackMap((current) => ({
+          ...current,
+          [designId]: [],
+        }));
+      })
+      .finally(() => {
+        if (active) {
+          setHydrated(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [designId]);
 
   const comments = useMemo(() => feedbackMap[designId] ?? [], [designId, feedbackMap]);
 
-  const addFeedback = (entry: { author: string; message: string; rating: number }) => {
-    const nextEntry: DesignFeedback = {
-      id: `${designId}-${Date.now()}`,
-      designId,
-      author: entry.author.trim() || 'Anonymous',
-      message: entry.message.trim(),
-      rating: Math.max(1, Math.min(5, Math.round(entry.rating || 0))),
-      createdAt: new Date().toISOString(),
-    };
+  const addFeedback = async (entry: { author: string; message: string; rating: number }) => {
+    setSubmitting(true);
 
-    const nextMap = {
-      ...feedbackMap,
-      [designId]: [nextEntry, ...(feedbackMap[designId] ?? [])],
-    };
+    try {
+      const nextEntry = await submitDesignFeedback({
+        designId,
+        author: entry.author,
+        message: entry.message,
+        rating: entry.rating,
+      });
 
-    setFeedbackMap(nextMap);
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextMap));
+      setFeedbackMap((current) => ({
+        ...current,
+        [designId]: [nextEntry, ...(current[designId] ?? [])],
+      }));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -61,6 +69,7 @@ export function useFeedback(designId: string) {
     comments,
     commentsCount: comments.length,
     hydrated,
+    submitting,
     addFeedback,
   };
 }

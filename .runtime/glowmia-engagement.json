@@ -1,0 +1,39 @@
+{
+  "designLikes": {
+    "ab7f52b3-d9fd-4bb9-a41b-c7da8caf3904": {
+      "7b7084e0-9919-43e2-88e0-3043d1644f75": {
+        "liked": true,
+        "updatedAt": "2026-04-15T16:51:17.526Z"
+      }
+    },
+    "c26a0550-94ba-4898-95b4-8160d0317915": {
+      "7b7084e0-9919-43e2-88e0-3043d1644f75": {
+        "liked": true,
+        "updatedAt": "2026-04-15T16:51:17.523Z"
+      }
+    },
+    "df2bfef5-b1a5-4ec0-8286-61ddd559b67e": {
+      "7b7084e0-9919-43e2-88e0-3043d1644f75": {
+        "liked": true,
+        "updatedAt": "2026-04-15T16:51:17.532Z"
+      }
+    },
+    "9480270f-ce74-4230-aa99-3769b1e708cd": {
+      "7b7084e0-9919-43e2-88e0-3043d1644f75": {
+        "liked": true,
+        "updatedAt": "2026-04-15T16:51:17.517Z"
+      }
+    }
+  },
+  "designFeedback": [],
+  "agentFeedback": [
+    {
+      "id": "agent-feedback-1776271029733-qoi4yn",
+      "sessionId": "005c865a-59c6-48f5-8efa-7d57c1b71897",
+      "language": "ar",
+      "rating": 5,
+      "message": "perfect",
+      "createdAt": "2026-04-15T16:37:09.733Z"
+    }
+  ]
+}

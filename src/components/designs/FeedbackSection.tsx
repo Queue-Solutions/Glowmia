@@ -11,7 +11,7 @@ type FeedbackSectionProps = {
 
 export function FeedbackSection({ designId }: FeedbackSectionProps) {
   const { language } = useSitePreferencesContext();
-  const { comments, addFeedback } = useFeedback(designId);
+  const { comments, addFeedback, submitting } = useFeedback(designId);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [rating, setRating] = useState(0);
@@ -21,18 +21,22 @@ export function FeedbackSection({ designId }: FeedbackSectionProps) {
   const ratingLabel = language === 'ar' ? 'التقييم' : 'Rating';
   const ratingHint = language === 'ar' ? 'مرري على النجوم ثم اختاري تقييمك.' : 'Hover and choose up to five stars.';
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!message.trim() || rating < 1) {
+    if (!message.trim() || rating < 1 || submitting) {
       return;
     }
 
-    addFeedback({ author: name, message, rating });
-    setName('');
-    setMessage('');
-    setRating(0);
-    setHoveredRating(0);
+    try {
+      await addFeedback({ author: name, message, rating });
+      setName('');
+      setMessage('');
+      setRating(0);
+      setHoveredRating(0);
+    } catch {
+      // Keep the current values so the user can retry without retyping.
+    }
   };
 
   return (
@@ -137,8 +141,8 @@ export function FeedbackSection({ designId }: FeedbackSectionProps) {
           </div>
 
           <div className="md:self-end">
-            <button type="submit" className="primary-button" disabled={rating < 1 || !message.trim()}>
-              {copyFor(language, glowmiaCopy.feedback.submit)}
+            <button type="submit" className="primary-button" disabled={rating < 1 || !message.trim() || submitting}>
+              {submitting ? (language === 'ar' ? 'جارٍ الإرسال...' : 'Sending...') : copyFor(language, glowmiaCopy.feedback.submit)}
             </button>
           </div>
         </div>

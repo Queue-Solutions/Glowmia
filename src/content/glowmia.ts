@@ -81,24 +81,24 @@ export const glowmiaCopy: CopyTree = {
     themeToggle: { en: 'Theme', ar: 'المظهر' },
   },
   home: {
-    heroEyebrow: { en: 'Glowmia Portfolio', ar: 'بورتفوليو جلووميا' },
+    heroEyebrow: { en: 'Glowmia Portfolio', ar: 'بوتيك Glowmia' },
     heroTitle: {
       en: 'Quiet luxury dresses shaped for memorable entrances.',
-      ar: 'فساتين بهدوء فاخر مصممة للحضور الذي لا يُنسى.',
+      ar: 'فساتين بهدوء فاخر صُممت لحضور لا يُنسى.',
     },
     heroDescription: {
       en: 'A curated fashion showcase of modern silhouettes, tactile fabrics, and evening-focused dress stories.',
-      ar: 'عرض أزياء منسق يبرز القصّات الحديثة والخامات الراقية وحكايات الفساتين المناسبة للمساء.',
+      ar: 'عرض أزياء منسق يبرز القصات الحديثة والخامات الراقية وحكايات الفساتين المناسبة لأمسياتك.',
     },
     heroPrimary: { en: 'Explore designs', ar: 'استكشفي التصاميم' },
-    heroSecondary: { en: 'Meet the brand', ar: 'تعرفي على العلامة' },
+    heroSecondary: { en: 'Meet the brand', ar: 'اكتشفي العلامة' },
     introTitle: {
       en: 'Glowmia blends editorial restraint with feminine precision.',
-      ar: 'تمزج جلووميا بين الرقي التحريري والدقة الأنثوية.',
+      ar: 'تمزج Glowmia بين الرقي الهادئ والدقة الأنثوية.',
     },
     introBody: {
       en: 'Every design is presented as a complete portfolio piece with mood, material story, and a clean visual rhythm that lets the dresses speak first.',
-      ar: 'يُعرض كل تصميم كقطعة بورتفوليو متكاملة تحمل مزاجاً خاصاً وحكاية خامة وإيقاعاً بصرياً نظيفاً يجعل الفستان يتصدر المشهد.',
+      ar: 'كل تصميم يُعرض كقطعة متكاملة تحمل مزاجًا خاصًا وحكاية خامة وإيقاعًا بصريًا نظيفًا يجعل الفستان هو البطل.',
     },
     featureLabel: { en: 'Featured designs', ar: 'تصاميم مميزة' },
     featureTitle: {
@@ -107,17 +107,17 @@ export const glowmiaCopy: CopyTree = {
     },
     featureDescription: {
       en: 'Browse the standout silhouettes first, then move into the full archive for more detail.',
-      ar: 'تصفحي القصّات الأبرز أولاً ثم انتقلي إلى الأرشيف الكامل لمزيد من التفاصيل.',
+      ar: 'تصفحي القصات الأبرز أولًا ثم انتقلي إلى الأرشيف الكامل لمزيد من التفاصيل.',
     },
     featureCta: { en: 'View all designs', ar: 'شاهدي كل التصاميم' },
     agentEyebrow: { en: 'AI Agent', ar: 'الوكيل الذكي' },
     agentTitle: {
-      en: 'A styling assistant is on the way.',
-      ar: 'مساعد تنسيق الأزياء قادم قريباً.',
+      en: 'Style with Glowmia Stylist.',
+      ar: 'تحدثي مع منسقة Glowmia.',
     },
     agentDescription: {
-      en: 'Glowmia Agent will guide outfit discovery, silhouette matching, and mood-based recommendations in a future release.',
-      ar: 'سيساعد وكيل جلووميا مستقبلاً في اكتشاف الإطلالات واختيار القصّات المناسبة وتوصيات تعتمد على المزاج العام.',
+      en: "Discover dresses, compare moods, and refine a selected look with Glowmia's live styling assistant.",
+      ar: 'اكتشفي الفساتين وقارني بين الأجواء وكمّلي تعديل الإطلالة مع منسقة Glowmia المباشرة.',
     },
     agentCta: { en: 'Visit agent page', ar: 'زيارة صفحة الوكيل' },
   },
@@ -125,7 +125,7 @@ export const glowmiaCopy: CopyTree = {
     title: { en: 'Design Gallery', ar: 'معرض التصاميم' },
     description: {
       en: 'A curated portfolio of dresses designed for evening moments, polished tailoring, and graceful movement.',
-      ar: 'بورتفوليو منسق لفساتين صُممت للحظات المساء والتفصيل المتقن والحركة الانسيابية.',
+      ar: 'مجموعة منسقة من الفساتين المصممة لأمسيات مميزة وتفصيل أنيق وحركة انسيابية.',
     },
     searchPlaceholder: { en: 'Search designs', ar: 'ابحثي عن تصميم' },
     filters: {
@@ -138,7 +138,7 @@ export const glowmiaCopy: CopyTree = {
     emptyTitle: { en: 'No designs found', ar: 'لم يتم العثور على تصاميم' },
     emptyDescription: {
       en: 'Try a different search or switch to another category.',
-      ar: 'جربي بحثاً مختلفاً أو انتقلي إلى فئة أخرى.',
+      ar: 'جربي بحثًا مختلفًا أو انتقلي إلى فئة أخرى.',
     },
     clearFilters: { en: 'Reset filters', ar: 'إعادة التصفية' },
     featuredLabel: { en: 'Featured', ar: 'مميز' },
@@ -162,7 +162,7 @@ export const glowmiaCopy: CopyTree = {
       length: { en: 'Length', ar: 'الطول' },
       style: { en: 'Style', ar: 'الأسلوب' },
       fabric: { en: 'Fabric', ar: 'الخامة' },
-      fit: { en: 'Fit', ar: 'القَصّة' },
+      fit: { en: 'Fit', ar: 'القصة' },
     },
   },
   feedback: {
@@ -183,24 +183,24 @@ export const glowmiaCopy: CopyTree = {
     saved: { en: 'Saved', ar: 'محفوظ' },
   },
   agent: {
-    eyebrow: { en: 'Coming soon', ar: 'قريباً' },
-    title: { en: 'Glowmia AI Agent', ar: 'وكيل جلووميا الذكي' },
+    eyebrow: { en: 'Live now', ar: 'متاح الآن' },
+    title: { en: 'Glowmia AI Agent', ar: 'وكيل Glowmia الذكي' },
     description: {
-      en: 'A future experience for guided inspiration, design discovery, and mood-led wardrobe conversations.',
-      ar: 'تجربة قادمة للإلهام الموجّه واكتشاف التصاميم وحوارات الأناقة المبنية على المزاج.',
+      en: 'An active styling space for guided inspiration, dress discovery, and custom visual refinements.',
+      ar: 'مساحة تنسيق فعالة للإلهام الموجّه واكتشاف الفساتين والتعديلات البصرية المخصصة.',
     },
     note: {
-      en: 'The interface is under development and will launch in a future milestone.',
-      ar: 'هذه الواجهة قيد التطوير وسيتم إطلاقها في مرحلة لاحقة.',
+      en: 'Start a session, choose a recommendation, and continue editing the full look in one flow.',
+      ar: 'ابدئي جلسة واختاري ترشيحًا ثم واصلي تعديل الإطلالة الكاملة داخل نفس التجربة.',
     },
     cta: { en: 'Back to gallery', ar: 'العودة إلى المعرض' },
   },
   footer: {
     strapline: {
       en: 'A contemporary dress portfolio focused on silhouette, finish, and feeling.',
-      ar: 'بورتفوليو معاصر للفساتين يركز على القَصّة واللمسة والإحساس.',
+      ar: 'بوتيك معاصر للفساتين يركز على القصة واللمسة والإحساس.',
     },
-    copyright: { en: 'All portfolio rights reserved.', ar: 'جميع حقوق البورتفوليو محفوظة.' },
+    copyright: { en: 'All portfolio rights reserved.', ar: 'جميع حقوق البوتيك محفوظة.' },
   },
 };
 

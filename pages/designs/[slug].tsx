@@ -1,14 +1,14 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import type { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+import type { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { DesignGallery } from '@/src/components/designs/DesignGallery';
 import { DesignInfo } from '@/src/components/designs/DesignInfo';
 import { FeedbackSection } from '@/src/components/designs/FeedbackSection';
 import { RelatedDesigns } from '@/src/components/designs/RelatedDesigns';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
-import { getAllDesignsFromSupabase, PUBLIC_PAGE_CACHE_CONTROL } from '@/src/services/dresses';
+import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { getDesignBySlug, getRelatedDesignsFromList, localizeText, type Design } from '@/src/data/designs';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 
@@ -17,8 +17,18 @@ type DesignDetailPageProps = {
   related: Design[];
 };
 
-export const getServerSideProps: GetServerSideProps<DesignDetailPageProps> = async ({ params, res }) => {
-  res.setHeader('Cache-Control', PUBLIC_PAGE_CACHE_CONTROL);
+export const getStaticPaths: GetStaticPaths = async () => {
+  const designs = await getAllDesignsFromSupabase();
+
+  return {
+    paths: designs.map((design) => ({
+      params: { slug: design.slug },
+    })),
+    fallback: 'blocking',
+  };
+};
+
+export const getStaticProps: GetStaticProps<DesignDetailPageProps> = async ({ params }) => {
   const slug = String(params?.slug ?? '');
   const designs = await getAllDesignsFromSupabase();
   const design = getDesignBySlug(designs, slug);
@@ -32,10 +42,11 @@ export const getServerSideProps: GetServerSideProps<DesignDetailPageProps> = asy
       design,
       related: getRelatedDesignsFromList(designs, design),
     },
+    revalidate: 60,
   };
 };
 
-export default function DesignDetailPage({ design, related }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+export default function DesignDetailPage({ design, related }: InferGetStaticPropsType<typeof getStaticProps>) {
   const { language } = useSitePreferencesContext();
 
   return (
