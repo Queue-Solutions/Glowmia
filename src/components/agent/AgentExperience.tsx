@@ -129,6 +129,7 @@ const copyByLanguage = {
     feedbackDescription: 'Rate this session and leave a quick note for the team.',
     feedbackPlaceholder: 'Anything you want us to improve?',
     feedbackSubmit: 'Send feedback',
+    feedbackLater: 'Rate later',
     feedbackThanks: 'Thank you. Your feedback is saved.',
     feedbackHint: 'Choose up to five stars.',
     feedbackError: 'Unable to save your feedback right now.',
@@ -197,6 +198,7 @@ const copyByLanguage = {
     feedbackDescription: 'قيّمي الجلسة واتركي ملاحظة سريعة للفريق.',
     feedbackPlaceholder: 'هل هناك شيء تريدين تحسينه؟',
     feedbackSubmit: 'إرسال التقييم',
+    feedbackLater: 'أقيّم لاحقًا',
     feedbackThanks: 'شكرًا لك. تم حفظ رأيك.',
     feedbackHint: 'اختاري حتى خمس نجوم.',
     feedbackError: 'تعذر حفظ رأيك الآن.',
@@ -298,6 +300,7 @@ export function AgentExperience() {
   const [hoveredAgentRating, setHoveredAgentRating] = useState(0);
   const [agentFeedback, setAgentFeedback] = useState('');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const previousLanguageRef = useRef(language);
@@ -320,10 +323,8 @@ export function AgentExperience() {
       ).slice(0, 8),
     [messages],
   );
-  const canLeaveFeedback = useMemo(
-    () => messages.some((message) => message.type === 'recommend' || message.type === 'edit'),
-    [messages],
-  );
+  const hasEditResult = useMemo(() => messages.some((message) => message.type === 'edit'), [messages]);
+  const shouldShowFeedbackPrompt = hasEditResult && !feedbackDismissed && feedbackState !== 'saved';
   const activeAgentRating = hoveredAgentRating || agentRating;
 
   useEffect(() => {
@@ -365,6 +366,7 @@ export function AgentExperience() {
     setHoveredAgentRating(0);
     setAgentFeedback('');
     setFeedbackState('idle');
+    setFeedbackDismissed(false);
 
     try {
       const session = await createAgentSession(copy.sessionTitle);
@@ -447,6 +449,8 @@ export function AgentExperience() {
             text: response.message || copy.editNoImageReturned,
           });
         } else {
+          setFeedbackDismissed(false);
+          setFeedbackState('idle');
           appendMessage({
             id: createMessageId(),
             role: 'assistant',
@@ -507,7 +511,7 @@ export function AgentExperience() {
   }
 
   async function handleSubmitSessionFeedback() {
-    if (!canLeaveFeedback || agentRating < 1 || feedbackState === 'saving') {
+    if (!hasEditResult || agentRating < 1 || feedbackState === 'saving') {
       return;
     }
 
@@ -521,6 +525,7 @@ export function AgentExperience() {
         message: agentFeedback,
       });
       setFeedbackState('saved');
+      setFeedbackDismissed(true);
     } catch {
       setFeedbackState('error');
     }
@@ -929,16 +934,13 @@ export function AgentExperience() {
               </div>
             ) : null}
 
-            {canLeaveFeedback ? (
+            {shouldShowFeedbackPrompt ? (
               <div className="agent-feedback-panel">
                 <div className="agent-feedback-panel__head">
                   <div>
                     <h3>{copy.feedbackTitle}</h3>
                     <p>{copy.feedbackDescription}</p>
                   </div>
-                  {feedbackState === 'saved' ? (
-                    <span className="agent-console__badge agent-console__badge--ready">{copy.feedbackThanks}</span>
-                  ) : null}
                 </div>
 
                 <div className="agent-feedback-panel__body">
@@ -985,18 +987,32 @@ export function AgentExperience() {
                       className="field-input"
                     />
 
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => void handleSubmitSessionFeedback()}
-                      disabled={agentRating < 1 || feedbackState === 'saving'}
-                    >
-                      {feedbackState === 'saving'
-                        ? language === 'ar'
-                          ? 'جارٍ الحفظ...'
-                          : 'Saving...'
-                        : copy.feedbackSubmit}
-                    </button>
+                    <div className="agent-feedback-panel__actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => {
+                          setFeedbackDismissed(true);
+                          setFeedbackState('idle');
+                        }}
+                        disabled={feedbackState === 'saving'}
+                      >
+                        {copy.feedbackLater}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => void handleSubmitSessionFeedback()}
+                        disabled={agentRating < 1 || feedbackState === 'saving'}
+                      >
+                        {feedbackState === 'saving'
+                          ? language === 'ar'
+                            ? 'جارٍ الحفظ...'
+                            : 'Saving...'
+                          : copy.feedbackSubmit}
+                      </button>
+                    </div>
                   </div>
 
                   {feedbackState === 'error' ? <p className="agent-feedback-panel__error">{copy.feedbackError}</p> : null}
