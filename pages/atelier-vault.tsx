@@ -390,18 +390,24 @@ export default function AtelierVaultPage({
           totalLikes: 'إجمالي الإعجابات',
           designFeedback: 'آراء التصاميم',
           agentFeedback: 'آراء الوكيل',
+          savedOrders: 'الطلبات المحفوظة',
           averageAgent: 'متوسط تقييم الوكيل',
           averageDesign: 'متوسط تقييم التصاميم',
           topLikedDesigns: 'أكثر التصاميم إعجابًا',
           latestDesignFeedback: 'أحدث آراء التصاميم',
           latestAgentFeedback: 'تقييمات Glowmia Stylist',
+          savedOrdersTitle: 'طلبات التصاميم المحفوظة',
           noLikedDesigns: 'لا توجد إعجابات مسجلة حتى الآن.',
           noDesignFeedback: 'لا توجد آراء على التصاميم حتى الآن.',
           noAgentFeedback: 'لا توجد تقييمات للوكيل حتى الآن.',
+          noSavedOrders: 'لا توجد طلبات محفوظة حتى الآن.',
           likesCount: (count: number) => `${count} إعجاب`,
           anonymous: 'زائر',
           unknownDesign: 'تصميم غير معروف',
           emptyInsights: 'لا توجد بيانات تفاعل بعد.',
+          customerName: 'الاسم',
+          customerPhone: 'الهاتف',
+          viewDesign: 'عرض التصميم',
         }
       : {
           catalogTab: 'Catalog',
@@ -412,18 +418,24 @@ export default function AtelierVaultPage({
           totalLikes: 'Total likes',
           designFeedback: 'Design feedback',
           agentFeedback: 'Agent feedback',
+          savedOrders: 'Saved orders',
           averageAgent: 'Avg. agent rating',
           averageDesign: 'Avg. design rating',
           topLikedDesigns: 'Most liked designs',
           latestDesignFeedback: 'Latest design feedback',
           latestAgentFeedback: 'Glowmia Stylist ratings',
+          savedOrdersTitle: 'Saved design orders',
           noLikedDesigns: 'No design likes recorded yet.',
           noDesignFeedback: 'No design feedback yet.',
           noAgentFeedback: 'No agent ratings yet.',
+          noSavedOrders: 'No saved design orders yet.',
           likesCount: (count: number) => `${count} like${count === 1 ? '' : 's'}`,
           anonymous: 'Visitor',
           unknownDesign: 'Unknown design',
           emptyInsights: 'No engagement data yet.',
+          customerName: 'Name',
+          customerPhone: 'Phone',
+          viewDesign: 'View design',
         };
 
   const [catalogDesigns, setCatalogDesigns] = useState(designs);
@@ -445,6 +457,7 @@ export default function AtelierVaultPage({
   const [insights, setInsights] = useState<AdminInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState('');
+  const [orderPreview, setOrderPreview] = useState<{ src: string; alt: string } | null>(null);
 
   const editorOpen = editorMode !== null;
   const editingDesign = useMemo(() => catalogDesigns.find((design) => design.id === editingDesignId) ?? null, [catalogDesigns, editingDesignId]);
@@ -455,14 +468,14 @@ export default function AtelierVaultPage({
   }, [designs]);
 
   useEffect(() => {
-    if (!editorOpen) return;
+    if (!editorOpen && !orderPreview) return;
     const original = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     return () => {
       document.body.style.overflow = original;
     };
-  }, [editorOpen]);
+  }, [editorOpen, orderPreview]);
 
   useEffect(() => {
     if (editorOpen) {
@@ -713,11 +726,12 @@ export default function AtelierVaultPage({
 
       {insights ? (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             {[
               { label: insightsUi.totalLikes, value: insights.totals.totalLikes },
               { label: insightsUi.designFeedback, value: insights.totals.designFeedbackCount },
               { label: insightsUi.agentFeedback, value: insights.totals.agentFeedbackCount },
+              { label: insightsUi.savedOrders, value: insights.totals.savedDesignOrdersCount },
               { label: insightsUi.averageDesign, value: insights.totals.averageDesignRating > 0 ? insights.totals.averageDesignRating.toFixed(1) : '0.0' },
               { label: insightsUi.averageAgent, value: insights.totals.averageAgentRating > 0 ? insights.totals.averageAgentRating.toFixed(1) : '0.0' },
             ].map((item) => (
@@ -821,6 +835,49 @@ export default function AtelierVaultPage({
                 )}
               </div>
             </section>
+
+            <section className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] md:p-5">
+              <h3 className="mb-4 text-xl font-semibold text-[color:var(--text-primary)]">{insightsUi.savedOrdersTitle}</h3>
+              <div className="grid gap-3">
+                {insights.savedDesignOrders.length === 0 ? (
+                  <p className="text-sm text-[color:var(--text-muted)]">{insightsUi.noSavedOrders}</p>
+                ) : (
+                  insights.savedDesignOrders.slice(0, 12).map((entry) => (
+                    <article key={entry.id} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[5.25rem_minmax(0,1fr)]">
+                      <button
+                        type="button"
+                        onClick={() => setOrderPreview({ src: entry.editedImageUrl, alt: entry.dressName })}
+                        className="overflow-hidden rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-base)] transition hover:scale-[1.01] hover:border-[color:var(--accent)]"
+                        aria-label={insightsUi.viewDesign}
+                        title={insightsUi.viewDesign}
+                      >
+                        <img src={entry.editedImageUrl} alt={entry.dressName} className="h-24 w-full object-cover object-top sm:h-full" />
+                      </button>
+
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h4 className="text-base font-semibold text-[color:var(--text-primary)]">{entry.dressName}</h4>
+                            <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{formatAdminDate(entry.createdAt)}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-1 text-sm text-[color:var(--text-muted)]">
+                          <p>
+                            <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerName}:</span>{' '}
+                            {entry.customerName}
+                          </p>
+                          <p>
+                            <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerPhone}:</span>{' '}
+                            {entry.customerPhone}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
         </>
       ) : null}
@@ -906,10 +963,6 @@ export default function AtelierVaultPage({
                   >
                     {mobileAdminMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                   </button>
-                  <button type="button" onClick={openCreateEditor} className="primary-button min-h-[2.9rem] flex-1 justify-center px-4">
-                    <Plus className="h-4 w-4" />
-                    {ui.addDesign}
-                  </button>
                 </div>
               ) : null}
 
@@ -925,8 +978,51 @@ export default function AtelierVaultPage({
                     <button type="button" onClick={toggleLanguage} className="secondary-button w-full justify-center">
                       {language === 'en' ? 'العربية' : 'English'}
                     </button>
-                    <button type="button" onClick={scrollToDesigns} className="secondary-button w-full justify-center">
-                      {ui.currentDesigns}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileAdminMenuOpen(false);
+                        scrollToDesigns();
+                      }}
+                      className="secondary-button w-full justify-center"
+                    >
+                      {insightsUi.catalogTab}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileAdminMenuOpen(false);
+                        setActiveView('insights');
+                        if (!insightsLoading) {
+                          void loadInsights();
+                        }
+                      }}
+                      className="secondary-button w-full justify-center"
+                    >
+                      {insightsUi.insightsTab}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileAdminMenuOpen(false);
+                        openCreateEditor();
+                      }}
+                      className="primary-button w-full justify-center"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {ui.addDesign}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileAdminMenuOpen(false);
+                        void loadInsights();
+                      }}
+                      className="secondary-button w-full justify-center"
+                      disabled={insightsLoading}
+                    >
+                      {insightsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {insightsUi.refresh}
                     </button>
                     <button type="button" onClick={handleLogout} className="secondary-button w-full justify-center">
                       <LogOut className="h-4 w-4" />
@@ -937,7 +1033,7 @@ export default function AtelierVaultPage({
               </AnimatePresence>
 
               {authenticated ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-4 hidden flex-wrap gap-2 md:flex">
                   <button
                     type="button"
                     onClick={() => setActiveView('catalog')}
@@ -1057,6 +1153,38 @@ export default function AtelierVaultPage({
         </main>
 
         <AnimatePresence>
+          {configured && authenticated && orderPreview ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60]">
+              <button
+                type="button"
+                onClick={() => setOrderPreview(null)}
+                className="absolute inset-0 bg-[rgba(16,10,9,0.72)] backdrop-blur-[2px]"
+                aria-label={ui.close}
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="absolute inset-3 flex items-center justify-center md:inset-8"
+              >
+                <div className="relative flex max-h-full w-full max-w-5xl items-center justify-center rounded-[1.75rem] border border-[color:var(--line)] bg-[color:var(--surface-base)] p-3 shadow-[0_24px_70px_rgba(0,0,0,0.28)] md:p-5">
+                  <button
+                    type="button"
+                    onClick={() => setOrderPreview(null)}
+                    className="secondary-button absolute right-3 top-3 z-10 min-h-[2.5rem] px-3 md:right-5 md:top-5"
+                  >
+                    <X className="h-4 w-4" />
+                    {ui.close}
+                  </button>
+
+                  <img src={orderPreview.src} alt={orderPreview.alt} className="max-h-[85vh] w-auto max-w-full rounded-[1.2rem] object-contain" />
+                </div>
+              </motion.div>
+            </motion.div>
+          ) : null}
+
           {configured && authenticated && editorOpen ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50">
               <button type="button" onClick={resetEditor} className="absolute inset-0 bg-[rgba(16,10,9,0.48)] backdrop-blur-[2px]" aria-label={ui.close} />
@@ -1230,31 +1358,6 @@ export default function AtelierVaultPage({
           ) : null}
         </AnimatePresence>
 
-        {configured && authenticated && !editorOpen ? (
-          <div className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-2 gap-2 rounded-[1.25rem] border border-[color:var(--line)] bg-[color:var(--surface)]/96 p-2 shadow-[var(--shadow-soft)] backdrop-blur md:hidden">
-            {activeView === 'catalog' ? (
-              <>
-                <button type="button" onClick={() => setActiveView('insights')} className="secondary-button w-full justify-center">
-                  {insightsUi.insightsTab}
-                </button>
-                <button type="button" onClick={openCreateEditor} className="primary-button w-full justify-center">
-                  <Plus className="h-4 w-4" />
-                  {ui.addDesign}
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" onClick={scrollToDesigns} className="secondary-button w-full justify-center">
-                  {insightsUi.catalogTab}
-                </button>
-                <button type="button" onClick={() => void loadInsights()} className="primary-button w-full justify-center" disabled={insightsLoading}>
-                  {insightsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {insightsUi.refresh}
-                </button>
-              </>
-            )}
-          </div>
-        ) : null}
       </div>
     </>
   );

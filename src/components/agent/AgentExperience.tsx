@@ -24,7 +24,7 @@ import {
   type AgentDress,
   type AgentEditResponse,
 } from '@/src/services/glowmiaAgent';
-import { submitAgentFeedback } from '@/src/services/engagement';
+import { submitAgentFeedback, submitSavedDesignOrder } from '@/src/services/engagement';
 
 type AgentMode = 'recommend' | 'edit';
 
@@ -133,6 +133,18 @@ const copyByLanguage = {
     feedbackThanks: 'Thank you. Your feedback is saved.',
     feedbackHint: 'Choose up to five stars.',
     feedbackError: 'Unable to save your feedback right now.',
+    saveDesign: 'Save this design',
+    saveDesignDescription: 'Save the final look to admin orders so the team can contact you.',
+    saveDesignNameLabel: 'Name',
+    saveDesignPhoneLabel: 'Phone number',
+    saveDesignNamePlaceholder: 'Your name',
+    saveDesignPhonePlaceholder: 'Your phone number',
+    saveDesignSubmit: 'Save to orders',
+    savingDesign: 'Saving...',
+    saveDesignSuccess: 'Saved to admin orders.',
+    saveDesignError: 'Unable to save this design right now.',
+    saveDesignRequired: 'Add your name and phone number first.',
+    dontSaveDesign: "Don't save",
   },
   ar: {
     eyebrow: 'Glowmia Stylist',
@@ -202,6 +214,18 @@ const copyByLanguage = {
     feedbackThanks: 'شكرًا لك. تم حفظ رأيك.',
     feedbackHint: 'اختاري حتى خمس نجوم.',
     feedbackError: 'تعذر حفظ رأيك الآن.',
+    saveDesign: 'حفظ هذا التصميم',
+    saveDesignDescription: 'احفظي الإطلالة النهائية في الطلبات ليتمكن الفريق من التواصل معك.',
+    saveDesignNameLabel: 'الاسم',
+    saveDesignPhoneLabel: 'رقم الهاتف',
+    saveDesignNamePlaceholder: 'اسمك',
+    saveDesignPhonePlaceholder: 'رقم هاتفك',
+    saveDesignSubmit: 'حفظ في الطلبات',
+    savingDesign: 'جارٍ الحفظ...',
+    saveDesignSuccess: 'تم الحفظ في الطلبات.',
+    saveDesignError: 'تعذر حفظ هذا التصميم الآن.',
+    saveDesignRequired: 'أضيفي الاسم ورقم الهاتف أولًا.',
+    dontSaveDesign: 'عدم الحفظ',
   },
 } as const;
 
@@ -301,9 +325,18 @@ export function AgentExperience() {
   const [agentFeedback, setAgentFeedback] = useState('');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
+  const [feedbackReady, setFeedbackReady] = useState(false);
+  const [saveTargetMessageId, setSaveTargetMessageId] = useState<string | null>(null);
+  const [saveCustomerName, setSaveCustomerName] = useState('');
+  const [saveCustomerPhone, setSaveCustomerPhone] = useState('');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
+  const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
+  const [hiddenSavePanelMessageIds, setHiddenSavePanelMessageIds] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const previousLanguageRef = useRef(language);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suggestionsFooter = suggestionsFooterByLanguage[language];
 
   const activeSuggestions = useMemo(
@@ -324,8 +357,49 @@ export function AgentExperience() {
     [messages],
   );
   const hasEditResult = useMemo(() => messages.some((message) => message.type === 'edit'), [messages]);
-  const shouldShowFeedbackPrompt = hasEditResult && !feedbackDismissed && feedbackState !== 'saved';
+  const latestEditMessage = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find((message): message is AgentEditMessage => message.type === 'edit') ?? null,
+    [messages],
+  );
+  const shouldShowFeedbackPrompt =
+    hasEditResult && feedbackReady && !loading && !input.trim() && !feedbackDismissed && feedbackState !== 'saved';
   const activeAgentRating = hoveredAgentRating || agentRating;
+
+  function clearFeedbackTimer() {
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
+  }
+
+  function scheduleFeedbackPrompt() {
+    if (feedbackState === 'saved') {
+      return;
+    }
+
+    clearFeedbackTimer();
+    setFeedbackReady(false);
+    setFeedbackDismissed(false);
+    setFeedbackState('idle');
+
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackReady(true);
+    }, 6000);
+  }
+
+  function hideFeedbackPrompt() {
+    clearFeedbackTimer();
+    setFeedbackReady(false);
+  }
+
+  function focusComposer() {
+    window.requestAnimationFrame(() => {
+      composerRef.current?.focus();
+    });
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -355,6 +429,8 @@ export function AgentExperience() {
     void initializeSession();
   }, [language]);
 
+  useEffect(() => () => clearFeedbackTimer(), []);
+
   async function initializeSession() {
     setBootstrapping(true);
     setError('');
@@ -367,6 +443,15 @@ export function AgentExperience() {
     setAgentFeedback('');
     setFeedbackState('idle');
     setFeedbackDismissed(false);
+    setFeedbackReady(false);
+    setSaveTargetMessageId(null);
+    setSaveCustomerName('');
+    setSaveCustomerPhone('');
+    setSaveState('idle');
+    setSaveError('');
+    setSavedMessageIds([]);
+    setHiddenSavePanelMessageIds([]);
+    clearFeedbackTimer();
 
     try {
       const session = await createAgentSession(copy.sessionTitle);
@@ -394,12 +479,22 @@ export function AgentExperience() {
   }
 
   function handleSelectDressForEdit(dress: AgentDress) {
+    if (selectedDress?.id === dress.id && mode === 'edit') {
+      setMobileRailOpen(false);
+      focusComposer();
+      return;
+    }
+
     const dressName = localizeDressName(dress, language);
 
+    hideFeedbackPrompt();
     setSelectedDress(dress);
     setMode('edit');
     setError('');
     setMobileRailOpen(false);
+    setSaveTargetMessageId(null);
+    setSaveState('idle');
+    setSaveError('');
 
     appendMessage({
       id: createMessageId(),
@@ -407,21 +502,26 @@ export function AgentExperience() {
       type: 'text',
       text: copy.selectDressMessage(dressName),
     });
+
+    focusComposer();
   }
 
   function handleClearSelection() {
+    hideFeedbackPrompt();
     setSelectedDress(null);
     setMode('recommend');
     setMobileRailOpen(false);
+    setSaveTargetMessageId(null);
   }
 
-  async function handleSend() {
-    const trimmed = input.trim();
+  async function handleSend(overrideInput?: string) {
+    const trimmed = (overrideInput ?? input).trim();
 
     if (!trimmed || !sessionId || loading) {
       return;
     }
 
+    hideFeedbackPrompt();
     appendMessage({
       id: createMessageId(),
       role: 'user',
@@ -432,6 +532,9 @@ export function AgentExperience() {
     setInput('');
     setLoading(true);
     setError('');
+    setSaveTargetMessageId(null);
+    setSaveState('idle');
+    setSaveError('');
 
     try {
       if (mode === 'edit' && selectedDress) {
@@ -451,8 +554,9 @@ export function AgentExperience() {
         } else {
           setFeedbackDismissed(false);
           setFeedbackState('idle');
+          const nextMessageId = createMessageId();
           appendMessage({
-            id: createMessageId(),
+            id: nextMessageId,
             role: 'assistant',
             type: 'edit',
             data: {
@@ -460,6 +564,10 @@ export function AgentExperience() {
               dressName: localizeDressName(selectedDress, language),
             },
           });
+          setSaveTargetMessageId(null);
+          setSaveCustomerName('');
+          setSaveCustomerPhone('');
+          scheduleFeedbackPrompt();
         }
 
         return;
@@ -506,8 +614,8 @@ export function AgentExperience() {
   }
 
   function handlePromptClick(prompt: string) {
-    setInput(prompt);
     setMobileRailOpen(false);
+    void handleSend(prompt);
   }
 
   async function handleSubmitSessionFeedback() {
@@ -528,6 +636,40 @@ export function AgentExperience() {
       setFeedbackDismissed(true);
     } catch {
       setFeedbackState('error');
+    }
+  }
+
+  async function handleSaveDesign(message: AgentEditMessage) {
+    const customerName = saveCustomerName.trim();
+    const customerPhone = saveCustomerPhone.trim();
+
+    if (!customerName || !customerPhone) {
+      setSaveState('error');
+      setSaveError(copy.saveDesignRequired);
+      return;
+    }
+
+    setSaveState('saving');
+    setSaveError('');
+
+    try {
+      await submitSavedDesignOrder({
+        sessionId,
+        language,
+        customerName,
+        customerPhone,
+        dressId: message.data.dress_id,
+        dressName: message.data.dressName,
+        originalImageUrl: message.data.original_image_url,
+        editedImageUrl: message.data.edited_image_url || message.data.original_image_url,
+      });
+      setSaveState('saved');
+      setSavedMessageIds((current) => (current.includes(message.id) ? current : [...current, message.id]));
+      setHiddenSavePanelMessageIds((current) => (current.includes(message.id) ? current : [...current, message.id]));
+      setSaveTargetMessageId(null);
+    } catch {
+      setSaveState('error');
+      setSaveError(copy.saveDesignError);
     }
   }
 
@@ -778,7 +920,7 @@ export function AgentExperience() {
                           key={suggestion}
                           type="button"
                           className="agent-chat-suggestion-item"
-                          onClick={() => setInput(suggestion)}
+                          onClick={() => handlePromptClick(suggestion)}
                         >
                           <Sparkles className="h-4 w-4" />
                           <span>{suggestion}</span>
@@ -796,6 +938,10 @@ export function AgentExperience() {
 
               {messages.map((message) => {
                 const isUser = message.role === 'user';
+                const isLatestEditMessage = message.type === 'edit' && message.id === latestEditMessage?.id;
+                const isSavePanelHidden = hiddenSavePanelMessageIds.includes(message.id);
+                const isSaveFormOpen = isLatestEditMessage && saveTargetMessageId === message.id;
+                const isSavedDesign = savedMessageIds.includes(message.id);
                 const hideInEmptyState =
                   showEmptyIntro &&
                   message.role === 'assistant' &&
@@ -900,6 +1046,105 @@ export function AgentExperience() {
                             </div>
                           </div>
                         ) : null}
+
+                        {isLatestEditMessage && !isSavePanelHidden ? (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="agent-save-panel"
+                          >
+                            <div className="agent-save-panel__head">
+                              <div>
+                                <h3>{copy.saveDesign}</h3>
+                                <p>{copy.saveDesignDescription}</p>
+                              </div>
+
+                              <button
+                                type="button"
+                                className="agent-save-panel__trigger"
+                                onClick={() => {
+                                  setSaveTargetMessageId((current) => (current === message.id ? null : message.id));
+                                  setSaveState('idle');
+                                  setSaveError('');
+                                }}
+                              >
+                                {copy.saveDesign}
+                              </button>
+                            </div>
+
+                            <AnimatePresence initial={false}>
+                              {isSaveFormOpen ? (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="agent-save-panel__body"
+                                >
+                                  <div className="agent-save-panel__fields">
+                                    <label className="agent-save-panel__field">
+                                      <span>{copy.saveDesignNameLabel}</span>
+                                      <input
+                                        value={saveCustomerName}
+                                        onChange={(event) => {
+                                          setSaveCustomerName(event.target.value);
+                                          setSaveState('idle');
+                                          setSaveError('');
+                                        }}
+                                        placeholder={copy.saveDesignNamePlaceholder}
+                                        className="field-input"
+                                      />
+                                    </label>
+
+                                    <label className="agent-save-panel__field">
+                                      <span>{copy.saveDesignPhoneLabel}</span>
+                                      <input
+                                        value={saveCustomerPhone}
+                                        onChange={(event) => {
+                                          setSaveCustomerPhone(event.target.value);
+                                          setSaveState('idle');
+                                          setSaveError('');
+                                        }}
+                                        placeholder={copy.saveDesignPhonePlaceholder}
+                                        className="field-input"
+                                        inputMode="tel"
+                                      />
+                                    </label>
+                                  </div>
+
+                                  <div className="agent-save-panel__actions">
+                                    <button
+                                      type="button"
+                                      className="agent-save-panel__dismiss"
+                                      onClick={() => {
+                                        setHiddenSavePanelMessageIds((current) => (current.includes(message.id) ? current : [...current, message.id]));
+                                        setSaveTargetMessageId(null);
+                                        setSaveState('idle');
+                                        setSaveError('');
+                                      }}
+                                      disabled={saveState === 'saving'}
+                                    >
+                                      {copy.dontSaveDesign}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className="agent-save-panel__confirm"
+                                      onClick={() => void handleSaveDesign(message)}
+                                      disabled={saveState === 'saving' || isSavedDesign}
+                                    >
+                                      {saveState === 'saving' ? copy.savingDesign : copy.saveDesignSubmit}
+                                    </button>
+                                  </div>
+
+                                  {isSavedDesign || saveState === 'saved' ? (
+                                    <p className="agent-save-panel__success">{copy.saveDesignSuccess}</p>
+                                  ) : null}
+                                  {saveState === 'error' && saveError ? <p className="agent-save-panel__error">{saveError}</p> : null}
+                                </motion.div>
+                              ) : null}
+                            </AnimatePresence>
+                          </motion.div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -935,7 +1180,12 @@ export function AgentExperience() {
             ) : null}
 
             {shouldShowFeedbackPrompt ? (
-              <div className="agent-feedback-panel">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 12 }}
+                className="agent-feedback-panel"
+              >
                 <div className="agent-feedback-panel__head">
                   <div>
                     <h3>{copy.feedbackTitle}</h3>
@@ -1017,7 +1267,7 @@ export function AgentExperience() {
 
                   {feedbackState === 'error' ? <p className="agent-feedback-panel__error">{copy.feedbackError}</p> : null}
                 </div>
-              </div>
+              </motion.div>
             ) : null}
 
             <div className="agent-composer">
@@ -1031,25 +1281,33 @@ export function AgentExperience() {
               <label htmlFor="agent-composer-input" className="sr-only">
                 Glowmia Stylist input
               </label>
-              <textarea
-                id="agent-composer-input"
-                ref={composerRef}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder={mode === 'edit' && selectedDress ? copy.composerEditPlaceholder : copy.composerPlaceholder}
-                className="agent-composer__input no-scrollbar"
-                rows={1}
-              />
+              <div className="agent-composer__shell">
+                <textarea
+                  id="agent-composer-input"
+                  ref={composerRef}
+                  value={input}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    if (event.target.value.trim()) {
+                      hideFeedbackPrompt();
+                    }
+                  }}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder={mode === 'edit' && selectedDress ? copy.composerEditPlaceholder : copy.composerPlaceholder}
+                  className="agent-composer__input no-scrollbar"
+                  rows={1}
+                />
 
-              <button
-                type="button"
-                className="primary-button agent-composer__submit"
-                onClick={() => void handleSend()}
-                disabled={!input.trim() || loading || !sessionId || bootstrapping}
-              >
-                {loading ? copy.sending : mode === 'edit' ? copy.applyEdit : copy.send}
-              </button>
+                <button
+                  type="button"
+                  className="agent-composer__submit"
+                  onClick={() => void handleSend()}
+                  disabled={!input.trim() || loading || !sessionId || bootstrapping}
+                  aria-label={loading ? copy.sending : mode === 'edit' ? copy.applyEdit : copy.send}
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

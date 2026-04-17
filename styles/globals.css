@@ -121,6 +121,23 @@ a {
   z-index: 1;
 }
 
+.site-preview-note {
+  position: fixed;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  z-index: 90;
+  pointer-events: none;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem;
+  opacity: 0.92;
+  backdrop-filter: blur(8px);
+}
+
 .theme-light .site-background {
   background: url('/dresses/covers/background.png');
   background-position: center top;

@@ -3,30 +3,38 @@
     "ab7f52b3-d9fd-4bb9-a41b-c7da8caf3904": {
       "7b7084e0-9919-43e2-88e0-3043d1644f75": {
         "liked": true,
-        "updatedAt": "2026-04-16T13:42:48.954Z"
+        "updatedAt": "2026-04-17T15:20:03.628Z"
       }
     },
     "c26a0550-94ba-4898-95b4-8160d0317915": {
       "7b7084e0-9919-43e2-88e0-3043d1644f75": {
         "liked": true,
-        "updatedAt": "2026-04-16T13:42:48.939Z"
+        "updatedAt": "2026-04-17T15:20:03.614Z"
       }
     },
     "df2bfef5-b1a5-4ec0-8286-61ddd559b67e": {
       "7b7084e0-9919-43e2-88e0-3043d1644f75": {
         "liked": true,
-        "updatedAt": "2026-04-16T13:42:48.967Z"
+        "updatedAt": "2026-04-17T15:20:03.643Z"
       }
     },
     "9480270f-ce74-4230-aa99-3769b1e708cd": {
       "7b7084e0-9919-43e2-88e0-3043d1644f75": {
         "liked": true,
-        "updatedAt": "2026-04-16T13:42:48.912Z"
+        "updatedAt": "2026-04-17T15:20:03.764Z"
       }
     }
   },
   "designFeedback": [],
   "agentFeedback": [
+    {
+      "id": "agent-feedback-1776437822357-64s64b",
+      "sessionId": "d2ed8f05-38e0-433d-8121-1fd1a2186a18",
+      "language": "ar",
+      "rating": 5,
+      "message": "رائع",
+      "createdAt": "2026-04-17T14:57:02.357Z"
+    },
     {
       "id": "agent-feedback-1776274630094-464u8e",
       "sessionId": "f89f1942-00f9-444e-85d0-5686a0f9e209",
@@ -50,6 +58,20 @@
       "rating": 5,
       "message": "perfect",
       "createdAt": "2026-04-15T16:37:09.733Z"
+    }
+  ],
+  "savedDesignOrders": [
+    {
+      "id": "saved-design-1776437750731-j0cvq4",
+      "sessionId": "d2ed8f05-38e0-433d-8121-1fd1a2186a18",
+      "language": "ar",
+      "customerName": "daniel",
+      "customerPhone": "01066841801",
+      "dressId": "fdc2c0ce-ab77-4b19-b006-085c65002b9d",
+      "dressName": "فستان فضي بأكمام شفافة وقصة V",
+      "originalImageUrl": "https://notbxjqdzszxgfjnphpz.supabase.co/storage/v1/object/public/dress-images/Dress%206.jpeg",
+      "editedImageUrl": "https://replicate.delivery/xezq/lhmApdq8VeS9FaZ9U2jQfVkzkgA8SiKpfNUxXd9SfXUa8efmF/tmp66j72x72.png",
+      "createdAt": "2026-04-17T14:55:50.731Z"
     }
   ]
 }

@@ -8,7 +8,10 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <SitePreferencesProvider>
       <FavoritesProvider>
-        <Component {...pageProps} />
+        <>
+          <Component {...pageProps} />
+          <div className="site-preview-note">This is a preview version. Some features are limited.</div>
+        </>
       </FavoritesProvider>
     </SitePreferencesProvider>
   );

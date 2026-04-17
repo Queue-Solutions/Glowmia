@@ -19,6 +19,19 @@ export type StoredAgentFeedback = {
   createdAt: string;
 };
 
+export type StoredSavedDesignOrder = {
+  id: string;
+  sessionId: string | null;
+  language: 'en' | 'ar';
+  customerName: string;
+  customerPhone: string;
+  dressId: string;
+  dressName: string;
+  originalImageUrl: string;
+  editedImageUrl: string;
+  createdAt: string;
+};
+
 type LikeState = {
   liked: boolean;
   updatedAt: string;
@@ -28,6 +41,7 @@ type EngagementStore = {
   designLikes: Record<string, Record<string, LikeState>>;
   designFeedback: StoredDesignFeedback[];
   agentFeedback: StoredAgentFeedback[];
+  savedDesignOrders: StoredSavedDesignOrder[];
 };
 
 const STORE_DIR = path.join(process.cwd(), '.runtime');
@@ -37,6 +51,7 @@ const emptyStore: EngagementStore = {
   designLikes: {},
   designFeedback: [],
   agentFeedback: [],
+  savedDesignOrders: [],
 };
 
 let writeQueue = Promise.resolve();
@@ -56,6 +71,7 @@ async function readStore(): Promise<EngagementStore> {
       designLikes: parsed.designLikes ?? {},
       designFeedback: Array.isArray(parsed.designFeedback) ? parsed.designFeedback : [],
       agentFeedback: Array.isArray(parsed.agentFeedback) ? parsed.agentFeedback : [],
+      savedDesignOrders: Array.isArray(parsed.savedDesignOrders) ? parsed.savedDesignOrders : [],
     };
   } catch {
     return emptyStore;
@@ -142,6 +158,26 @@ export async function addAgentFeedback(entry: Omit<StoredAgentFeedback, 'id' | '
   });
 }
 
+export async function addSavedDesignOrder(entry: Omit<StoredSavedDesignOrder, 'id' | 'createdAt'>) {
+  return updateStore((store) => {
+    const nextEntry: StoredSavedDesignOrder = {
+      id: `saved-design-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sessionId: entry.sessionId || null,
+      language: entry.language,
+      customerName: entry.customerName.trim(),
+      customerPhone: entry.customerPhone.trim(),
+      dressId: entry.dressId.trim(),
+      dressName: entry.dressName.trim(),
+      originalImageUrl: entry.originalImageUrl.trim(),
+      editedImageUrl: entry.editedImageUrl.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    store.savedDesignOrders.unshift(nextEntry);
+    return nextEntry;
+  });
+}
+
 export async function getEngagementInsights() {
   const store = await readStore();
 
@@ -165,10 +201,12 @@ export async function getEngagementInsights() {
     designLikes,
     designFeedback: store.designFeedback.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     agentFeedback: store.agentFeedback.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    savedDesignOrders: store.savedDesignOrders.sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     totals: {
       totalLikes,
       designFeedbackCount: store.designFeedback.length,
       agentFeedbackCount: store.agentFeedback.length,
+      savedDesignOrdersCount: store.savedDesignOrders.length,
       averageDesignRating:
         designRatings.length > 0 ? designRatings.reduce((sum, value) => sum + value, 0) / designRatings.length : 0,
       averageAgentRating:

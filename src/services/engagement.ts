@@ -16,6 +16,19 @@ export type AgentFeedbackEntry = {
   createdAt: string;
 };
 
+export type SavedDesignOrderEntry = {
+  id: string;
+  sessionId: string | null;
+  language: 'en' | 'ar';
+  customerName: string;
+  customerPhone: string;
+  dressId: string;
+  dressName: string;
+  originalImageUrl: string;
+  editedImageUrl: string;
+  createdAt: string;
+};
+
 export type AdminInsights = {
   designLikes: Array<{
     designId: string;
@@ -24,10 +37,12 @@ export type AdminInsights = {
   }>;
   designFeedback: DesignFeedbackEntry[];
   agentFeedback: AgentFeedbackEntry[];
+  savedDesignOrders: SavedDesignOrderEntry[];
   totals: {
     totalLikes: number;
     designFeedbackCount: number;
     agentFeedbackCount: number;
+    savedDesignOrdersCount: number;
     averageDesignRating: number;
     averageAgentRating: number;
   };
@@ -83,6 +98,20 @@ export async function submitAgentFeedback(input: {
 }) {
   const payload = await postJson<{ feedback: AgentFeedbackEntry }>('/api/engagement/agent-feedback', input);
   return payload.feedback;
+}
+
+export async function submitSavedDesignOrder(input: {
+  sessionId: string | null;
+  language: 'en' | 'ar';
+  customerName: string;
+  customerPhone: string;
+  dressId: string;
+  dressName: string;
+  originalImageUrl: string;
+  editedImageUrl: string;
+}) {
+  const payload = await postJson<{ order: SavedDesignOrderEntry }>('/api/engagement/agent-design-order', input);
+  return payload.order;
 }
 
 export async function fetchAdminInsights() {
