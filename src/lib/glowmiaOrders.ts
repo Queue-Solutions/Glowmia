@@ -119,6 +119,13 @@ const ORDER_FIELDS = [
 let supabaseClient: SupabaseClient | null | undefined;
 const tableColumnCache = new Map<string, Promise<Set<string>>>();
 
+type SupabaseLikeError = {
+  message: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+};
+
 function getSupabaseKey() {
   return (
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
@@ -150,6 +157,10 @@ function getServerSupabaseClient() {
   });
 
   return supabaseClient;
+}
+
+function hasServiceRoleKey() {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
 }
 
 function isMissingTableError(message: string) {
@@ -204,6 +215,34 @@ function readOptionalString(value: unknown) {
 
 function readBoolean(value: unknown) {
   return value === true;
+}
+
+function describeSupabaseError(error: SupabaseLikeError, context: string) {
+  const details = [error.message.trim()];
+
+  if (error.code) {
+    details.push(`code=${error.code}`);
+  }
+
+  if (error.details) {
+    details.push(`details=${error.details}`);
+  }
+
+  if (error.hint) {
+    details.push(`hint=${error.hint}`);
+  }
+
+  return `[${context}] ${details.join(' | ')}`;
+}
+
+function toErrorWithContext(error: SupabaseLikeError, context: string) {
+  if (error.code === '42501' && !hasServiceRoleKey()) {
+    return new Error(
+      `${describeSupabaseError(error, context)}. The "${SAVED_DESIGNS_TABLE}" table is protected by RLS, and this route currently has no SUPABASE_SERVICE_ROLE_KEY configured.`,
+    );
+  }
+
+  return new Error(describeSupabaseError(error, context));
 }
 
 async function getAvailableColumns(table: string, candidates: readonly string[]) {
@@ -348,7 +387,7 @@ export async function saveAgentDesign(input: SaveDesignInput) {
   const { data, error } = await supabase.from(SAVED_DESIGNS_TABLE).insert(payload).select(select).single();
 
   if (error) {
-    throw new Error(error.message);
+    throw toErrorWithContext(error, 'saveAgentDesign.insert');
   }
 
   return readSavedDesign((data ?? {}) as unknown as Record<string, unknown>);
@@ -366,7 +405,7 @@ export async function getSavedDesignById(savedDesignId: string) {
   const { data, error } = await supabase.from(SAVED_DESIGNS_TABLE).select(select).eq('id', savedDesignId).maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw toErrorWithContext(error, 'getSavedDesignById.select');
   }
 
   if (!data) {
@@ -402,7 +441,7 @@ export async function markSavedDesignOrdered(savedDesignId: string, orderId: str
   const { data, error } = await supabase.from(SAVED_DESIGNS_TABLE).update(payload).eq('id', savedDesignId).select(select).maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    throw toErrorWithContext(error, 'markSavedDesignOrdered.update');
   }
 
   return data ? readSavedDesign(data as unknown as Record<string, unknown>) : null;
@@ -490,7 +529,7 @@ export async function createCheckoutOrders(input: CreateOrderRowsInput) {
   const { data, error } = await supabase.from(ORDERS_TABLE).insert(payload).select(select);
 
   if (error) {
-    throw new Error(error.message);
+    throw toErrorWithContext(error, 'createCheckoutOrders.insert');
   }
 
   return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(readCheckoutOrder);
@@ -514,7 +553,7 @@ export async function listCheckoutOrdersFromSupabase() {
   const { data, error } = await query;
 
   if (error) {
-    throw new Error(error.message);
+    throw toErrorWithContext(error, 'listCheckoutOrdersFromSupabase.select');
   }
 
   return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(readCheckoutOrder);
@@ -532,7 +571,7 @@ export async function listSavedDesignsForAdmin() {
   const { data, error } = await supabase.from(SAVED_DESIGNS_TABLE).select(select).order('created_at', { ascending: false });
 
   if (error) {
-    throw new Error(error.message);
+    throw toErrorWithContext(error, 'listSavedDesignsForAdmin.select');
   }
 
   return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {

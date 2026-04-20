@@ -20,13 +20,32 @@ export default async function handler(request: NextApiRequest, response: NextApi
     return;
   }
 
-  response.status(201).json({
-    ok: true,
-    feedback: await addAgentFeedback({
+  try {
+    const feedback = await addAgentFeedback({
       sessionId,
       language,
       rating,
       message,
-    }),
-  });
+    });
+
+    response.status(201).json({
+      ok: true,
+      feedback,
+    });
+  } catch (error) {
+    console.error('[api/engagement/agent-feedback] Failed to save agent feedback.', {
+      error: error instanceof Error ? error.message : error,
+      sessionId,
+      language,
+      rating,
+      hasMessage: Boolean(message),
+    });
+
+    response.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Unable to save the agent feedback. Check the server logs for more details.',
+    });
+  }
 }

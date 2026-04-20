@@ -22,17 +22,11 @@ type CheckoutRequestBody = {
   guestId?: unknown;
 };
 
-type NotificationResult = {
-  status: 'sent' | 'skipped' | 'failed';
-  error?: string;
-};
-
 type CheckoutOrderItem = CheckoutOrderRecord['items'][number];
 
 const VALID_SIZES = new Set(['S', 'M', 'L']);
 const MAX_FIELD_LENGTH = 300;
 const MAX_ITEMS = 30;
-const DEFAULT_CHECKOUT_EMAIL_TO = 'queuesolutions25@gmail.com';
 
 function readTrimmedString(value: unknown, maxLength = MAX_FIELD_LENGTH) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
@@ -62,85 +56,6 @@ function readCheckoutItems(value: unknown) {
       };
     })
     .filter((item): item is { designId: string; size: string; quantity: number } => Boolean(item));
-}
-
-function formatMultiValueField(values: Array<string | null | undefined>) {
-  const normalized = values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
-  return normalized.length > 0 ? normalized.join('\n') : '';
-}
-
-function buildFormSubmitPayload(input: {
-  orderReference: string;
-  customer: { name: string; phone: string; address: string; city: string };
-  notes: string;
-  items: CheckoutOrderItem[];
-}) {
-  const payload = new URLSearchParams();
-
-  payload.set('_subject', 'New Glowmia Order');
-  payload.set('_template', 'table');
-  payload.set('_captcha', 'false');
-
-  payload.set('order_reference', input.orderReference);
-  payload.set('customer_name', input.customer.name);
-  payload.set('phone', input.customer.phone);
-  payload.set('email', '');
-  payload.set('address', input.customer.address);
-  payload.set('city', input.customer.city);
-  payload.set('notes', input.notes);
-  payload.set('dress_id', formatMultiValueField(input.items.map((item) => item.designId)));
-  payload.set('dress_name', formatMultiValueField(input.items.map((item) => item.designName)));
-  payload.set('size', formatMultiValueField(input.items.map((item) => item.size || 'custom')));
-  payload.set('color', formatMultiValueField(input.items.map((item) => item.color || '')));
-  payload.set('quantity', formatMultiValueField(input.items.map((item) => String(item.quantity))));
-  payload.set('saved_design_id', formatMultiValueField(input.items.map((item) => item.savedDesignId || '')));
-  payload.set('edited_image_url', formatMultiValueField(input.items.map((item) => item.editedImageUrl || '')));
-  payload.set('order_total', '');
-  payload.set('front_view_url', formatMultiValueField(input.items.map((item) => item.frontViewUrl)));
-  payload.set('side_view_url', formatMultiValueField(input.items.map((item) => item.sideViewUrl || '')));
-  payload.set('back_view_url', formatMultiValueField(input.items.map((item) => item.backViewUrl || '')));
-  payload.set(
-    'items_summary',
-    input.items
-      .map((item, index) =>
-        [
-          `${index + 1}. ${item.designName}`,
-          `Dress ID: ${item.designId}`,
-          `Size: ${item.size || 'custom'}`,
-          `Color: ${item.color || '-'}`,
-          `Quantity: ${item.quantity}`,
-          `Saved design ID: ${item.savedDesignId || '-'}`,
-          `Edited image: ${item.editedImageUrl || '-'}`,
-        ].join(' | '),
-      )
-      .join('\n'),
-  );
-
-  return payload;
-}
-
-async function sendEmailViaFormSubmit(payload: URLSearchParams): Promise<NotificationResult> {
-  const to = process.env.CHECKOUT_EMAIL_TO?.trim() || DEFAULT_CHECKOUT_EMAIL_TO;
-
-  try {
-    const apiResponse = await fetch(`https://formsubmit.co/${encodeURIComponent(to)}`, {
-      method: 'POST',
-      redirect: 'manual',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-      },
-      body: payload.toString(),
-    });
-
-    if (apiResponse.status >= 400) {
-      return { status: 'failed', error: await apiResponse.text() };
-    }
-
-    return { status: 'sent' };
-  } catch (error) {
-    return { status: 'failed', error: error instanceof Error ? error.message : 'Unable to send email.' };
-  }
 }
 
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
@@ -255,23 +170,9 @@ export default async function handler(request: NextApiRequest, response: NextApi
       await markSavedDesignOrdered(savedDesign.id, orderReference);
     }
 
-    const emailPayload = buildFormSubmitPayload({
-      orderReference,
-      customer,
-      notes,
-      items,
-    });
-    const emailResult = await sendEmailViaFormSubmit(emailPayload);
-
-    if (emailResult.status === 'failed') {
-      console.error('FormSubmit order email failed:', emailResult.error || 'Unknown FormSubmit error.');
-    }
-
     response.status(201).json({
       ok: true,
       orderId: orderReference,
-      emailStatus: emailResult.status,
-      emailError: emailResult.status === 'failed' ? emailResult.error || 'Unable to send order email.' : null,
     });
   } catch (error) {
     response.status(500).json({

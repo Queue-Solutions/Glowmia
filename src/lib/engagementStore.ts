@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import os from 'os';
 import path from 'path';
 
 export type StoredDesignFeedback = {
@@ -44,7 +45,7 @@ type EngagementStore = {
   savedDesignOrders: StoredSavedDesignOrder[];
 };
 
-const STORE_DIR = path.join(process.cwd(), '.runtime');
+const STORE_DIR = path.join(os.tmpdir(), 'glowmia-runtime');
 const STORE_PATH = path.join(STORE_DIR, 'glowmia-engagement.json');
 
 const emptyStore: EngagementStore = {

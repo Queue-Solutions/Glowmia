@@ -23,8 +23,6 @@ type CheckoutPageProps = {
 type CheckoutResponse = {
   ok?: boolean;
   orderId?: string;
-  emailStatus?: 'sent' | 'skipped' | 'failed';
-  emailError?: string | null;
   error?: string;
 };
 
@@ -52,6 +50,14 @@ type DisplayCheckoutItem =
       size: string | null;
       quantity: number;
     };
+
+const FORM_SUBMIT_ACTION = 'https://formsubmit.co/queuesolutions25@gmail.com';
+const FORM_SUBMIT_FRAME = 'glowmia-formsubmit-frame';
+const SUCCESS_REDIRECT_DELAY_MS = 500;
+
+function joinOrderFieldValues(values: Array<string | null | undefined>) {
+  return values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)).join('\n');
+}
 
 export const getStaticProps: GetStaticProps<CheckoutPageProps> = async () => {
   const designs = await getAllDesignsFromSupabase();
@@ -114,6 +120,25 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
       phone: current.phone || prefillPhone,
     }));
   }, [router.isReady, router.query.prefillName, router.query.prefillPhone]);
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const success = router.query.success === 'true';
+    const queryOrderId = typeof router.query.orderId === 'string' ? router.query.orderId.trim() : '';
+
+    if (!success) {
+      return;
+    }
+
+    setSubmitState('success');
+
+    if (queryOrderId) {
+      setOrderId(queryOrderId);
+    }
+  }, [router.isReady, router.query.orderId, router.query.success]);
 
   useEffect(() => {
     if (!router.isReady) {
@@ -207,6 +232,69 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     setError('');
   };
 
+  const submitOrderEmail = (fullPhone: string) => {
+    if (typeof document === 'undefined') {
+      throw new Error('Form submission is only available in the browser.');
+    }
+
+    let iframe = document.querySelector(`iframe[name="${FORM_SUBMIT_FRAME}"]`) as HTMLIFrameElement | null;
+
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.name = FORM_SUBMIT_FRAME;
+      iframe.title = FORM_SUBMIT_FRAME;
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.tabIndex = -1;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    const form = document.createElement('form');
+    form.action = FORM_SUBMIT_ACTION;
+    form.method = 'POST';
+    form.target = FORM_SUBMIT_FRAME;
+    form.style.display = 'none';
+
+    const fields = {
+      customer_name: formState.name,
+      phone: fullPhone,
+      address: formState.address,
+      city: formState.city,
+      dress_id: joinOrderFieldValues(
+        displayItems.map((item) => {
+          if (item.kind === 'saved') {
+            return item.savedDesign.dressId;
+          }
+
+          return item.design.id;
+        }),
+      ),
+      dress_name: joinOrderFieldValues(displayItems.map((item) => item.designName)),
+      size: joinOrderFieldValues(displayItems.map((item) => item.size || 'custom')),
+      quantity: joinOrderFieldValues(displayItems.map((item) => String(item.quantity))),
+      notes: formState.notes,
+      edited_image_url: savedDesign?.editedImageUrl || '',
+      saved_design_id: savedDesign?.id || '',
+      _subject: 'New Glowmia Order',
+      _template: 'table',
+    };
+
+    Object.entries(fields).forEach(([key, value]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = value || '';
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+
+    window.setTimeout(() => {
+      form.remove();
+    }, 1000);
+  };
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -255,13 +343,28 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
         throw new Error(data.error || copyFor(language, glowmiaCopy.checkout.requiredError));
       }
 
-      if (data.emailStatus === 'failed') {
-        console.warn('Glowmia order email failed:', data.emailError || 'Unable to send order email.');
+      try {
+        submitOrderEmail(fullPhone);
+      } catch (emailError) {
+        console.error('Glowmia order email failed:', emailError instanceof Error ? emailError.message : 'Unable to submit the order email.');
       }
 
       setOrderId(data.orderId || '');
       setSubmitState('success');
       clearCart();
+      window.setTimeout(() => {
+        void router.replace(
+          {
+            pathname: '/checkout',
+            query: {
+              success: 'true',
+              orderId: data.orderId || undefined,
+            },
+          },
+          undefined,
+          { shallow: true },
+        );
+      }, SUCCESS_REDIRECT_DELAY_MS);
     } catch (submitError) {
       setSubmitState('error');
       setError(submitError instanceof Error ? submitError.message : copyFor(language, glowmiaCopy.checkout.requiredError));

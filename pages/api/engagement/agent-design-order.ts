@@ -51,8 +51,24 @@ export default async function handler(request: NextApiRequest, response: NextApi
       savedDesign,
     });
   } catch (error) {
+    console.error('[api/engagement/agent-design-order] Failed to save edited design.', {
+      error: error instanceof Error ? error.message : error,
+      dressId,
+      dressName,
+      hasOriginalImageUrl: Boolean(originalImageUrl),
+      hasEditedImageUrl: Boolean(editedImageUrl),
+      hasUserId: Boolean(userId),
+      hasGuestId: Boolean(guestId),
+      hasPrompt: Boolean(prompt),
+      sessionId,
+      language,
+    });
+
     response.status(500).json({
-      error: error instanceof Error ? error.message : 'Unable to save the edited design.',
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Unable to save the edited design. Check the server logs for the insert failure details.',
     });
   }
 }
