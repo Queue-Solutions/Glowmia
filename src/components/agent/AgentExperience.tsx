@@ -300,7 +300,7 @@ function formatParsedEditValue(value: unknown) {
 }
 
 function getRecommendationImageUrl(dress: AgentDress) {
-  return dress.cover_image_url || dress.image_url;
+  return dress.front_view_url || dress.image_url;
 }
 
 function getEditingImageUrl(dress: AgentDress) {

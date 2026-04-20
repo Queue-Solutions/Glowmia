@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart } from 'lucide-react';
+import { Check, Heart, ShoppingCart } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
 import type { Design } from '@/src/data/designs';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { useFavoritesContext } from '@/src/context/FavoritesContext';
+import { useCartContext } from '@/src/context/CartContext';
+import { cartSizes, type CartSize } from '@/src/hooks/useCart';
 import { localizeText } from '@/src/data/designs';
 
 type DesignCardProps = {
@@ -17,8 +19,11 @@ type DesignCardProps = {
 export function DesignCard({ design, priority = false }: DesignCardProps) {
   const { language } = useSitePreferencesContext();
   const { isFavorite, toggleFavorite } = useFavoritesContext();
+  const { addItem, hasItem } = useCartContext();
   const saved = isFavorite(design.id);
   const [burstToken, setBurstToken] = useState<number | null>(null);
+  const [selectedSize, setSelectedSize] = useState<CartSize>('M');
+  const [addedToken, setAddedToken] = useState<number | null>(null);
 
   const handleFavoriteToggle = () => {
     toggleFavorite(design.id);
@@ -28,6 +33,17 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
       setBurstToken((currentToken) => (currentToken === nextToken ? null : currentToken));
     }, 620);
   };
+
+  const handleAddToCart = () => {
+    addItem(design.id, selectedSize);
+    const nextToken = Date.now();
+    setAddedToken(nextToken);
+    window.setTimeout(() => {
+      setAddedToken((currentToken) => (currentToken === nextToken ? null : currentToken));
+    }, 1500);
+  };
+
+  const itemAlreadyInCart = hasItem(design.id, selectedSize);
 
   return (
     <motion.article whileHover={{ y: -4 }} transition={{ duration: 0.22, ease: 'easeOut' }} className="group relative">
@@ -82,6 +98,30 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
           </p>
         </div>
       </Link>
+
+      <div className="cart-card-controls">
+        <div className="cart-size-group" aria-label={copyFor(language, glowmiaCopy.cart.sizeLabel)}>
+          <span className="cart-size-label">{copyFor(language, glowmiaCopy.cart.sizeLabel)}</span>
+          <div className="cart-size-options">
+            {cartSizes.map((size) => (
+              <button
+                key={`${design.id}-${size}`}
+                type="button"
+                onClick={() => setSelectedSize(size)}
+                className={`cart-size-button ${selectedSize === size ? 'cart-size-button--active' : ''}`}
+                aria-pressed={selectedSize === size}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button type="button" onClick={handleAddToCart} className={`primary-button cart-add-button ${addedToken ? 'cart-add-button--added' : ''}`}>
+          {addedToken ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+          {addedToken || itemAlreadyInCart ? copyFor(language, glowmiaCopy.cart.added) : copyFor(language, glowmiaCopy.cart.addToCart)}
+        </button>
+      </div>
     </motion.article>
   );
 }

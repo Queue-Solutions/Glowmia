@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Image from 'next/image';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Design } from '@/src/data/designs';
 import { glowmiaCopy, copyFor } from '@/src/content/glowmia';
@@ -14,34 +15,36 @@ export function DesignGallery({ design }: { design: Design }) {
     {
       id: `${design.id}-cover`,
       image: design.coverImage,
-      label: language === 'ar' ? 'صورة الغلاف' : 'Cover View',
+      label: language === 'ar' ? 'الأمام' : 'Front View',
       objectPosition: 'center top',
     },
   ];
 
-  const fullView =
-    design.detailImage && design.detailImage !== design.coverImage
-      ? [
-          {
-            id: `${design.id}-full`,
-            image: design.detailImage,
-            label: language === 'ar' ? 'الصورة الكاملة' : 'Full 3-View',
-            objectPosition: 'center center',
-          },
-        ]
-      : [];
+  const viewLabels =
+    language === 'ar'
+      ? ['الجانب', 'الخلف']
+      : ['Side View', 'Back View'];
 
   const additionalViews = design.galleryImages
-    .filter((image) => image !== design.coverImage && image !== design.detailImage)
+    .filter((image) => image !== design.coverImage)
     .map((image, index) => ({
       id: `${design.id}-extra-${index + 1}`,
       image,
-      label: language === 'ar' ? `عرض إضافي ${index + 1}` : `Additional ${index + 1}`,
+      label: viewLabels[index] ?? (language === 'ar' ? `عرض إضافي ${index + 1}` : `Additional ${index + 1}`),
       objectPosition: 'center center',
     }));
 
-  const selectableViews = [...baseViews, ...fullView, ...additionalViews];
+  const selectableViews = [...baseViews, ...additionalViews];
   const activeView = selectableViews[activeIndex] ?? selectableViews[0];
+  const hasMultipleViews = selectableViews.length > 1;
+
+  const showPreviousImage = () => {
+    setActiveIndex((current) => (current - 1 + selectableViews.length) % selectableViews.length);
+  };
+
+  const showNextImage = () => {
+    setActiveIndex((current) => (current + 1) % selectableViews.length);
+  };
 
   return (
     <div className="space-y-4">
@@ -71,6 +74,26 @@ export function DesignGallery({ design }: { design: Design }) {
                 />
               </motion.div>
             </AnimatePresence>
+            {hasMultipleViews ? (
+              <div className="detail-gallery__arrows" aria-label={language === 'ar' ? 'تصفح صور التصميم' : 'Cycle design images'}>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  className="detail-gallery__arrow detail-gallery__arrow--previous"
+                  aria-label={language === 'ar' ? 'الصورة السابقة' : 'Previous image'}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="detail-gallery__arrow detail-gallery__arrow--next"
+                  aria-label={language === 'ar' ? 'الصورة التالية' : 'Next image'}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

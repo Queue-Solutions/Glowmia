@@ -6,7 +6,7 @@ class DressBase(BaseModel):
     id: str
     name: str
     image_url: str
-    cover_image_url: Optional[str] = None
+    front_view_url: Optional[str] = None
     detail_image_url: Optional[str] = None
     category: Optional[str] = None
     occasion: Optional[List[str]] = None

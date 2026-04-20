@@ -15,3 +15,4 @@ glowmia-agent/backend/.backend*.log
 glowmia-agent/frontend/dummy-ui/node_modules/
 .agent-runtime/
 .agent-runtime-backend*.log
+.runtime/

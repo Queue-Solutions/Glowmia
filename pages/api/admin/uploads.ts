@@ -40,15 +40,60 @@ function pickFile(fileValue: File | File[] | undefined) {
   return Array.isArray(fileValue) ? fileValue[0] ?? null : fileValue;
 }
 
-function sanitizeFileName(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/-+/g, '-');
+function readJsonBody(request: NextApiRequest) {
+  return new Promise<any>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+
+    request.on('data', (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    request.on('end', () => {
+      if (chunks.length === 0) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    request.on('error', reject);
+  });
+}
+
+function normalizeImageKind(value: string) {
+  if (value === 'side' || value === 'back') {
+    return value;
+  }
+
+  return 'front';
+}
+
+function sanitizeDressId(value: string) {
+  return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-+/g, '-');
+}
+
+async function removeStoragePaths(adminSupabase: any, paths: unknown) {
+  const storagePaths = Array.isArray(paths)
+    ? paths.filter((entry): entry is string => typeof entry === 'string' && entry.startsWith('dresses/'))
+    : [];
+
+  if (storagePaths.length === 0) {
+    return { error: null };
+  }
+
+  return adminSupabase.storage.from(DRESS_IMAGES_BUCKET).remove(storagePaths);
 }
 
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
 
-  if (request.method !== 'POST') {
-    response.setHeader('Allow', 'POST');
+  if (request.method !== 'POST' && request.method !== 'DELETE') {
+    response.setHeader('Allow', 'POST, DELETE');
     response.status(405).json({ error: 'Method not allowed.' });
     return;
   }
@@ -66,10 +111,31 @@ export default async function handler(request: NextApiRequest, response: NextApi
   }
 
   try {
+    if (request.method === 'DELETE') {
+      const body = await readJsonBody(request);
+      const { error } = await removeStoragePaths(adminSupabase, body?.paths);
+
+      if (error) {
+        response.status(500).json({ error: error.message });
+        return;
+      }
+
+      response.status(200).json({ ok: true });
+      return;
+    }
+
     const { fields, files } = await parseUploadRequest(request);
     const uploadKind = Array.isArray(fields.kind) ? fields.kind[0] : fields.kind;
-    const kind = typeof uploadKind === 'string' && uploadKind.trim() === 'cover' ? 'cover' : 'full';
+    const normalizedKind = typeof uploadKind === 'string' ? uploadKind.trim() : '';
+    const kind = normalizeImageKind(normalizedKind);
+    const rawDressId = Array.isArray(fields.dressId) ? fields.dressId[0] : fields.dressId;
+    const dressId = typeof rawDressId === 'string' ? sanitizeDressId(rawDressId) : '';
     const file = pickFile(files.file as File | File[] | undefined);
+
+    if (!dressId) {
+      response.status(400).json({ error: 'A dress id is required before uploading dress images.' });
+      return;
+    }
 
     if (!file) {
       response.status(400).json({ error: 'An image file is required.' });
@@ -77,8 +143,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
     }
 
     const extension = path.extname(file.originalFilename || file.filepath || '').toLowerCase() || '.jpg';
-    const safeName = sanitizeFileName(path.basename(file.originalFilename || `upload${extension}`, extension));
-    const storagePath = `admin-uploads/${kind}s/${Date.now()}-${safeName}${extension}`;
+    const storagePath = `dresses/${dressId}/${kind}-${Date.now()}${extension}`;
     const fileBuffer = await readFile(file.filepath);
 
     const { error } = await adminSupabase.storage.from(DRESS_IMAGES_BUCKET).upload(storagePath, fileBuffer, {

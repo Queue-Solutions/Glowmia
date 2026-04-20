@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, Home, Menu, Moon, Shirt, Sun, X } from 'lucide-react';
+import { Bot, Home, Menu, Moon, Shirt, ShoppingCart, Sun, X } from 'lucide-react';
 import { glowmiaCopy, copyFor } from '@/src/content/glowmia';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
+import { useCartContext } from '@/src/context/CartContext';
 
 type SiteHeaderProps = {
   currentPath: string;
@@ -26,6 +27,7 @@ const navIcons = {
 
 export function SiteHeader({ currentPath }: SiteHeaderProps) {
   const { darkMode, language, toggleDarkMode, toggleLanguage } = useSitePreferencesContext();
+  const { totalQuantity, hydrated } = useCartContext();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -35,12 +37,21 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--line)]/80 bg-[color:var(--surface)]/92 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-4 md:px-10">
-        <Link href="/" className="flex items-center gap-3 text-[color:var(--text-primary)] transition-opacity hover:opacity-80">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)] font-display text-xl">
-            G
-          </span>
-          <span className="font-display text-2xl leading-none">Glowmia</span>
-        </Link>
+        <div className="header-brand-cluster">
+          <Link
+            href="/cart"
+            className={`header-cart-link ${currentPath === '/cart' ? 'header-cart-link--active' : ''}`}
+            aria-label={copyFor(language, glowmiaCopy.cart.title)}
+            title={copyFor(language, glowmiaCopy.cart.title)}
+          >
+            <ShoppingCart className="h-[1.05rem] w-[1.05rem]" />
+            {hydrated && totalQuantity > 0 ? <span className="cart-nav-badge">{totalQuantity}</span> : null}
+          </Link>
+
+          <Link href="/" className="flex items-center gap-3 text-[color:var(--text-primary)] transition-opacity hover:opacity-80">
+            <span className="font-display text-2xl leading-none">Glowmia</span>
+          </Link>
+        </div>
 
         <nav className="hidden items-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)]/92 p-1 md:flex">
           {glowmiaCopy.header.nav.map((item) => {
@@ -100,7 +111,7 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
                       transition={{ duration: 0.16, delay: index * 0.025 }}
                     >
                       <Link href={item.href} className={`mobile-menu-link ${isActive ? 'mobile-menu-link--active' : ''}`}>
-                        {copyFor(language, item.label)}
+                        <span>{copyFor(language, item.label)}</span>
                       </Link>
                     </motion.div>
                   );

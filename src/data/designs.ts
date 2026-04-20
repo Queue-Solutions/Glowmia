@@ -53,8 +53,10 @@ export type DressRow = {
   fabric_ar?: string | null;
   fit?: string | null;
   fit_ar?: string | null;
-  cover_image_url?: string | null;
   image_url?: string | null;
+  front_view_url?: string | null;
+  side_view_url?: string | null;
+  back_view_url?: string | null;
   created_at?: string | null;
   is_featured?: boolean | null;
   gallery_image_urls?: string[] | null;
@@ -134,6 +136,14 @@ function normalizeCategory(value: unknown, occasion?: unknown, style?: unknown):
 }
 
 function normalizeGalleryImages(row: DressRow, coverImage: string) {
+  const viewImages = [row.side_view_url, row.back_view_url]
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .map((entry) => entry.trim());
+
+  if (viewImages.length > 0) {
+    return viewImages;
+  }
+
   const values = [row.gallery_image_urls, row.gallery_images, row.image_urls]
     .find((entry) => Array.isArray(entry)) as string[] | undefined;
 
@@ -264,7 +274,7 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
   const id = String(row.id ?? `dress-${index + 1}`);
   const name = cleanText(row.name, `Glowmia Design ${index + 1}`);
   const category = normalizeCategory(row.category, row.occasion, row.style);
-  const coverImage = cleanText(row.cover_image_url, cleanText(row.image_url, FALLBACK_IMAGE));
+  const coverImage = cleanText(row.front_view_url, cleanText(row.image_url, FALLBACK_IMAGE));
   const detailImage = resolveDetailImage(row, coverImage, coverImage);
   const normalizedGalleryImages = normalizeGalleryImages(row, detailImage || coverImage);
   const galleryImages = Array.from(new Set([detailImage, ...normalizedGalleryImages].filter(Boolean)));

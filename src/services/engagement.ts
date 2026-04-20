@@ -48,6 +48,29 @@ export type AdminInsights = {
   };
 };
 
+export type CheckoutOrderEntry = {
+  id: string;
+  customer: {
+    name: string;
+    phone: string;
+    email: string;
+    country: string;
+  };
+  items: Array<{
+    designId: string;
+    designName: string;
+    slug: string;
+    size: 'S' | 'M' | 'L';
+    quantity: number;
+    imageUrl: string;
+  }>;
+  notifications: {
+    email: 'sent' | 'skipped' | 'failed';
+    whatsapp: 'sent' | 'skipped' | 'failed';
+  };
+  createdAt: string;
+};
+
 async function postJson<T>(url: string, body: unknown) {
   const response = await fetch(url, {
     method: 'POST',
@@ -123,4 +146,15 @@ export async function fetchAdminInsights() {
   }
 
   return payload;
+}
+
+export async function fetchAdminCheckoutOrders() {
+  const response = await fetch('/api/admin/checkout-orders');
+  const payload = (await response.json()) as { orders?: CheckoutOrderEntry[]; error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? 'Unable to load checkout orders.');
+  }
+
+  return payload.orders ?? [];
 }

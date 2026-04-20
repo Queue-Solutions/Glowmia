@@ -9,12 +9,12 @@ import type { Design } from '@/src/data/designs';
 import { getAdminUsernameFromRequest, isAdminConfigured } from '@/src/lib/adminAuth';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import type { Language } from '@/src/content/glowmia';
-import { fetchAdminInsights, type AdminInsights } from '@/src/services/engagement';
+import { fetchAdminCheckoutOrders, fetchAdminInsights, type AdminInsights, type CheckoutOrderEntry } from '@/src/services/engagement';
 
 type AdminPageProps = { configured: boolean; authenticated: boolean; designs: Design[] };
 type EditorMode = 'create' | 'edit' | null;
 type OptionItem = { value: string; en: string; ar: string };
-type AdminView = 'catalog' | 'insights';
+type AdminView = 'catalog' | 'insights' | 'orders';
 
 type AdminFormState = {
   name: string;
@@ -37,7 +37,8 @@ type AdminFormState = {
   fit: string;
   fitAr: string;
   coverImageUrl: string;
-  imageUrl: string;
+  sideImageUrl: string;
+  backImageUrl: string;
 };
 
 const initialAdminForm: AdminFormState = {
@@ -61,7 +62,8 @@ const initialAdminForm: AdminFormState = {
   fit: '',
   fitAr: '',
   coverImageUrl: '',
-  imageUrl: '',
+  sideImageUrl: '',
+  backImageUrl: '',
 };
 
 const splitCsv = (value: string) => value.split(',').map((entry) => entry.trim()).filter(Boolean);
@@ -119,16 +121,20 @@ const adminCopy = {
     saveMessageUpdate: 'Design updated in Supabase and reflected on the public website.',
     deleteMessage: 'Design removed from Supabase.',
     removeConfirm: 'Remove this design from Supabase and the public gallery?',
-    imagesRequired: 'Add a cover image and a full image by upload or URL before saving.',
-    coverUpload: 'Cover image upload',
-    fullUpload: 'Full image upload',
-    coverUrl: 'Cover image URL',
-    fullUrl: 'Full image URL',
+    imagesRequired: 'Add a cover/front image by upload or URL before saving.',
+    coverUpload: 'Cover/front image upload',
+    sideUpload: 'Side view upload',
+    backUpload: 'Back view upload',
+    coverUrl: 'Cover/front image URL',
+    sideUrl: 'Side view URL',
+    backUrl: 'Back view URL',
     keepingCurrentCover: 'Keeping current cover image unless you upload a replacement.',
-    keepingCurrentFull: 'Keeping current full image unless you upload a replacement.',
+    keepingCurrentSide: 'Keeping current side image unless you upload a replacement.',
+    keepingCurrentBack: 'Keeping current back image unless you upload a replacement.',
     selectedFile: (name: string) => `Selected: ${name}`,
-    coverPreview: 'Cover preview appears here.',
-    fullPreview: 'Full-image preview appears here.',
+    coverPreview: 'Cover/front preview appears here.',
+    sidePreview: 'Side view preview appears here.',
+    backPreview: 'Back view preview appears here.',
     designName: 'Design name',
     designNameAr: 'Design name in Arabic',
     description: 'Description',
@@ -202,16 +208,20 @@ const adminCopy = {
     saveMessageUpdate: 'تم تحديث التصميم في Supabase وانعكس على الموقع العام.',
     deleteMessage: 'تم حذف التصميم من Supabase.',
     removeConfirm: 'هل تريدين حذف هذا التصميم من Supabase ومن المعرض العام؟',
-    imagesRequired: 'أضيفي صورة غلاف وصورة كاملة عبر الرفع أو الرابط قبل الحفظ.',
-    coverUpload: 'رفع صورة الغلاف',
-    fullUpload: 'رفع الصورة الكاملة',
-    coverUrl: 'رابط صورة الغلاف',
-    fullUrl: 'رابط الصورة الكاملة',
+    imagesRequired: 'أضيفي صورة الغلاف أو الأمام عبر الرفع أو الرابط قبل الحفظ.',
+    coverUpload: 'رفع صورة الغلاف/الأمام',
+    sideUpload: 'رفع صورة الجانب',
+    backUpload: 'رفع صورة الخلف',
+    coverUrl: 'رابط صورة الغلاف/الأمام',
+    sideUrl: 'رابط صورة الجانب',
+    backUrl: 'رابط صورة الخلف',
     keepingCurrentCover: 'سيتم الاحتفاظ بصورة الغلاف الحالية ما لم ترفعي بديلًا.',
-    keepingCurrentFull: 'سيتم الاحتفاظ بالصورة الكاملة الحالية ما لم ترفعي بديلًا.',
+    keepingCurrentSide: 'سيتم الاحتفاظ بصورة الجانب الحالية ما لم ترفعي بديلًا.',
+    keepingCurrentBack: 'سيتم الاحتفاظ بصورة الخلف الحالية ما لم ترفعي بديلًا.',
     selectedFile: (name: string) => `تم اختيار: ${name}`,
-    coverPreview: 'ستظهر معاينة الغلاف هنا.',
-    fullPreview: 'ستظهر معاينة الصورة الكاملة هنا.',
+    coverPreview: 'ستظهر معاينة الغلاف/الأمام هنا.',
+    sidePreview: 'ستظهر معاينة الجانب هنا.',
+    backPreview: 'ستظهر معاينة الخلف هنا.',
     designName: 'اسم التصميم',
     designNameAr: 'اسم التصميم بالعربية',
     description: 'الوصف',
@@ -311,7 +321,17 @@ function autoTranslate(text: string, from: Language, to: Language): string {
   return text;
 }
 
+function getDesignViewImages(design: Design) {
+  const images = Array.from(new Set(design.galleryImages.filter((image) => image && image !== design.coverImage)));
+  const sideImage = images.find((image) => image.includes('/admin-uploads/side/')) ?? images[0] ?? '';
+  const backImage = images.find((image) => image.includes('/admin-uploads/back/')) ?? images.find((image) => image !== sideImage) ?? '';
+
+  return [sideImage, backImage];
+}
+
 function designToFormState(design: Design): AdminFormState {
+  const viewImages = getDesignViewImages(design);
+
   return {
     name: design.name.en,
     nameAr: design.name.ar === design.name.en ? '' : design.name.ar,
@@ -333,7 +353,8 @@ function designToFormState(design: Design): AdminFormState {
     fit: design.fit.en,
     fitAr: design.fit.ar === design.fit.en ? '' : design.fit.ar,
     coverImageUrl: design.coverImage,
-    imageUrl: design.detailImage || design.galleryImages[0] || design.coverImage,
+    sideImageUrl: viewImages[0] ?? '',
+    backImageUrl: viewImages[1] ?? '',
   };
 }
 
@@ -384,6 +405,7 @@ export default function AtelierVaultPage({
       ? {
           catalogTab: 'التصاميم',
           insightsTab: 'الرؤى',
+          ordersTab: 'طلبات الشراء',
           refresh: 'تحديث',
           insightsTitle: 'رؤى Glowmia',
           insightsDescription: 'شاهدي التفاعل على التصاميم وآراء الزوار وتقييمات الوكيل في مكان واحد.',
@@ -407,11 +429,24 @@ export default function AtelierVaultPage({
           emptyInsights: 'لا توجد بيانات تفاعل بعد.',
           customerName: 'الاسم',
           customerPhone: 'الهاتف',
+          customerEmail: 'البريد',
+          customerCountry: 'البلد',
           viewDesign: 'عرض التصميم',
+          checkoutOrdersTitle: 'طلبات الشراء',
+          checkoutOrdersDescription: 'راجعي طلبات صفحة الدفع مع بيانات العميل والفساتين المختارة.',
+          noCheckoutOrders: 'لا توجد طلبات شراء بعد.',
+          orderReference: 'رقم الطلب',
+          notificationStatus: 'الإشعارات',
+          email: 'البريد',
+          whatsapp: 'واتساب',
+          size: 'المقاس',
+          quantity: 'الكمية',
+          dressId: 'رقم التصميم',
         }
       : {
           catalogTab: 'Catalog',
           insightsTab: 'Insights',
+          ordersTab: 'Orders',
           refresh: 'Refresh',
           insightsTitle: 'Glowmia insights',
           insightsDescription: 'See design engagement, visitor comments, and agent ratings in one place.',
@@ -435,7 +470,19 @@ export default function AtelierVaultPage({
           emptyInsights: 'No engagement data yet.',
           customerName: 'Name',
           customerPhone: 'Phone',
+          customerEmail: 'Email',
+          customerCountry: 'Country',
           viewDesign: 'View design',
+          checkoutOrdersTitle: 'Checkout orders',
+          checkoutOrdersDescription: 'Review checkout-page orders with buyer credentials and selected dresses.',
+          noCheckoutOrders: 'No checkout orders yet.',
+          orderReference: 'Order reference',
+          notificationStatus: 'Notifications',
+          email: 'Email',
+          whatsapp: 'WhatsApp',
+          size: 'Size',
+          quantity: 'Qty',
+          dressId: 'Design ID',
         };
 
   const [catalogDesigns, setCatalogDesigns] = useState(designs);
@@ -451,12 +498,16 @@ export default function AtelierVaultPage({
   const [panelMessage, setPanelMessage] = useState('');
   const [panelError, setPanelError] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [fullFile, setFullFile] = useState<File | null>(null);
+  const [sideFile, setSideFile] = useState<File | null>(null);
+  const [backFile, setBackFile] = useState<File | null>(null);
   const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState<AdminView>('catalog');
   const [insights, setInsights] = useState<AdminInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState('');
+  const [checkoutOrders, setCheckoutOrders] = useState<CheckoutOrderEntry[] | null>(null);
+  const [checkoutOrdersLoading, setCheckoutOrdersLoading] = useState(false);
+  const [checkoutOrdersError, setCheckoutOrdersError] = useState('');
   const [orderPreview, setOrderPreview] = useState<{ src: string; alt: string } | null>(null);
 
   const editorOpen = editorMode !== null;
@@ -488,7 +539,8 @@ export default function AtelierVaultPage({
     setEditingDesignId(null);
     setFormState(initialAdminForm);
     setCoverFile(null);
-    setFullFile(null);
+    setSideFile(null);
+    setBackFile(null);
   };
 
   const openCreateEditor = () => {
@@ -505,22 +557,40 @@ export default function AtelierVaultPage({
     setEditingDesignId(design.id);
     setFormState(designToFormState(design));
     setCoverFile(null);
-    setFullFile(null);
+    setSideFile(null);
+    setBackFile(null);
   };
 
-  const uploadAdminImage = async (file: File, kind: 'cover' | 'full') => {
+  const uploadAdminImage = async (file: File, kind: 'front' | 'side' | 'back', dressId: string) => {
     const uploadForm = new FormData();
     uploadForm.append('kind', kind);
+    uploadForm.append('dressId', dressId);
     uploadForm.append('file', file);
 
     const response = await fetch('/api/admin/uploads', { method: 'POST', body: uploadForm });
-    const payload = (await response.json()) as { error?: string; publicUrl?: string };
+    const payload = (await response.json()) as { error?: string; path?: string; publicUrl?: string };
 
-    if (!response.ok || !payload.publicUrl) {
+    if (!response.ok || !payload.publicUrl || !payload.path) {
       throw new Error(payload.error ?? `Unable to upload the ${kind} image.`);
     }
 
-    return payload.publicUrl;
+    return { path: payload.path, publicUrl: payload.publicUrl };
+  };
+
+  const cleanupUploadedImages = async (paths: string[]) => {
+    if (paths.length === 0) {
+      return;
+    }
+
+    try {
+      await fetch('/api/admin/uploads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths }),
+      });
+    } catch (error) {
+      console.error('Unable to clean up uploaded dress images after a failed save:', error);
+    }
   };
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -567,6 +637,19 @@ export default function AtelierVaultPage({
     }
   }, []);
 
+  const loadCheckoutOrders = useCallback(async () => {
+    setCheckoutOrdersLoading(true);
+    setCheckoutOrdersError('');
+
+    try {
+      setCheckoutOrders(await fetchAdminCheckoutOrders());
+    } catch (error) {
+      setCheckoutOrdersError(error instanceof Error ? error.message : 'Unable to load checkout orders.');
+    } finally {
+      setCheckoutOrdersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authenticated || !configured || activeView !== 'insights' || insightsLoading || insights) {
       return;
@@ -574,6 +657,14 @@ export default function AtelierVaultPage({
 
     void loadInsights();
   }, [activeView, authenticated, configured, insights, insightsLoading, loadInsights]);
+
+  useEffect(() => {
+    if (!authenticated || !configured || activeView !== 'orders' || checkoutOrdersLoading || checkoutOrders) {
+      return;
+    }
+
+    void loadCheckoutOrders();
+  }, [activeView, authenticated, checkoutOrders, checkoutOrdersLoading, configured, loadCheckoutOrders]);
 
   const scrollToDesigns = () => {
     setActiveView('catalog');
@@ -590,24 +681,37 @@ export default function AtelierVaultPage({
     setSaveState('saving');
     setPanelError('');
     setPanelMessage('');
+    const uploadedImagePaths: string[] = [];
 
     try {
-      const coverImageUrl = coverFile ? await uploadAdminImage(coverFile, 'cover') : formState.coverImageUrl.trim();
-      const imageUrl = fullFile ? await uploadAdminImage(fullFile, 'full') : formState.imageUrl.trim();
+      const isEditing = editorMode === 'edit' && Boolean(editingDesignId);
+      const targetDressId = isEditing ? editingDesignId as string : crypto.randomUUID();
+      const uploadViewImage = async (file: File, kind: 'front' | 'side' | 'back') => {
+        const uploaded = await uploadAdminImage(file, kind, targetDressId);
+        uploadedImagePaths.push(uploaded.path);
+        return uploaded.publicUrl;
+      };
+      const coverImageUrl = coverFile ? await uploadViewImage(coverFile, 'front') : formState.coverImageUrl.trim();
+      const sideImageUrl = sideFile ? await uploadViewImage(sideFile, 'side') : formState.sideImageUrl.trim();
+      const backImageUrl = backFile ? await uploadViewImage(backFile, 'back') : formState.backImageUrl.trim();
 
-      if (!coverImageUrl || !imageUrl) {
+      if (!coverImageUrl) {
+        await cleanupUploadedImages(uploadedImagePaths);
         setPanelError(ui.imagesRequired);
         return;
       }
 
-      const isEditing = editorMode === 'edit' && Boolean(editingDesignId);
       const response = await fetch(isEditing ? `/api/admin/designs/${editingDesignId}` : '/api/admin/designs', {
         method: isEditing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formState,
+          id: isEditing ? undefined : targetDressId,
           coverImageUrl,
-          imageUrl,
+          imageUrl: coverImageUrl,
+          frontViewUrl: coverImageUrl,
+          sideViewUrl: sideImageUrl,
+          backViewUrl: backImageUrl,
           occasion: splitCsv(formState.occasion),
           occasionAr: splitCsv(formState.occasionAr),
           style: splitCsv(formState.style),
@@ -618,6 +722,7 @@ export default function AtelierVaultPage({
       const payload = (await response.json()) as { error?: string; design?: Design | null };
 
       if (!response.ok) {
+        await cleanupUploadedImages(uploadedImagePaths);
         setPanelError(payload.error ?? ui.saveError);
         return;
       }
@@ -634,6 +739,7 @@ export default function AtelierVaultPage({
       resetEditor();
       setPanelMessage(isEditing ? ui.saveMessageUpdate : ui.saveMessageCreate);
     } catch (error) {
+      await cleanupUploadedImages(uploadedImagePaths);
       setPanelError(error instanceof Error ? error.message : ui.saveError);
     } finally {
       setSaveState('idle');
@@ -884,6 +990,125 @@ export default function AtelierVaultPage({
     </section>
   );
 
+  const checkoutOrdersView = (
+    <section className="space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <h2 className="font-display text-3xl text-[color:var(--text-primary)] sm:text-4xl md:text-5xl">{insightsUi.checkoutOrdersTitle}</h2>
+          <p className="max-w-3xl text-sm leading-7 text-[color:var(--text-muted)] md:text-base md:leading-8">{insightsUi.checkoutOrdersDescription}</p>
+        </div>
+        <button type="button" onClick={() => void loadCheckoutOrders()} className="secondary-button" disabled={checkoutOrdersLoading}>
+          {checkoutOrdersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {insightsUi.refresh}
+        </button>
+      </div>
+
+      {checkoutOrdersError ? <div className="rounded-[1.5rem] border border-[#b2555d]/20 bg-[#b2555d]/10 px-4 py-4 text-sm text-[#b2555d]">{checkoutOrdersError}</div> : null}
+
+      {!checkoutOrders && !checkoutOrdersLoading ? (
+        <div className="rounded-[1.5rem] border border-dashed border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-10 text-center text-sm text-[color:var(--text-muted)]">
+          {insightsUi.noCheckoutOrders}
+        </div>
+      ) : null}
+
+      {checkoutOrdersLoading && !checkoutOrders ? (
+        <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-10 text-center text-sm text-[color:var(--text-muted)]">
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {insightsUi.refresh}
+          </span>
+        </div>
+      ) : null}
+
+      {checkoutOrders ? (
+        checkoutOrders.length === 0 ? (
+          <div className="rounded-[1.5rem] border border-dashed border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-10 text-center text-sm text-[color:var(--text-muted)]">
+            {insightsUi.noCheckoutOrders}
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {checkoutOrders.map((order) => (
+              <article key={order.id} className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] md:p-5">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{formatAdminDate(order.createdAt)}</p>
+                      <h3 className="mt-2 break-all text-xl font-semibold text-[color:var(--text-primary)]">{order.id}</h3>
+                    </div>
+
+                    <div className="grid gap-2 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 text-sm text-[color:var(--text-muted)]">
+                      <p>
+                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerName}:</span>{' '}
+                        {order.customer.name}
+                      </p>
+                      <p>
+                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerPhone}:</span>{' '}
+                        {order.customer.phone}
+                      </p>
+                      <p>
+                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerEmail}:</span>{' '}
+                        <a href={`mailto:${order.customer.email}`} className="underline-offset-4 hover:underline">{order.customer.email}</a>
+                      </p>
+                      <p>
+                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerCountry}:</span>{' '}
+                        {order.customer.country}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <span className="eyebrow-chip !px-3 !py-2 !text-[0.65rem]">
+                        {insightsUi.email}: {order.notifications.email}
+                      </span>
+                      <span className="eyebrow-chip !px-3 !py-2 !text-[0.65rem]">
+                        {insightsUi.whatsapp}: {order.notifications.whatsapp}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {order.items.map((item) => (
+                      <article key={`${order.id}-${item.designId}-${item.size}`} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
+                        <button
+                          type="button"
+                          onClick={() => setOrderPreview({ src: item.imageUrl, alt: item.designName })}
+                          className="overflow-hidden rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-base)] transition hover:scale-[1.01] hover:border-[color:var(--accent)]"
+                          aria-label={insightsUi.viewDesign}
+                          title={insightsUi.viewDesign}
+                        >
+                          <img src={item.imageUrl} alt={item.designName} className="h-28 w-full object-cover object-top sm:h-full" />
+                        </button>
+
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-base font-semibold text-[color:var(--text-primary)]">{item.designName}</h4>
+                              <p className="break-all text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                                {insightsUi.dressId}: {item.designId}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-base)] px-3 py-1 text-xs text-[color:var(--text-muted)]">
+                              {insightsUi.size}: {item.size}
+                            </span>
+                            <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-base)] px-3 py-1 text-xs text-[color:var(--text-muted)]">
+                              {insightsUi.quantity}: {item.quantity}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
+      ) : null}
+    </section>
+  );
+
   const renderAuthless = !configured ? (
     <section className="rounded-[2rem] border border-dashed border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-8">
       <h2 className="font-display text-3xl text-[color:var(--text-primary)]">{ui.adminSetupTitle}</h2>
@@ -1005,6 +1230,19 @@ export default function AtelierVaultPage({
                       type="button"
                       onClick={() => {
                         setMobileAdminMenuOpen(false);
+                        setActiveView('orders');
+                        if (!checkoutOrdersLoading) {
+                          void loadCheckoutOrders();
+                        }
+                      }}
+                      className="secondary-button w-full justify-center"
+                    >
+                      {insightsUi.ordersTab}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileAdminMenuOpen(false);
                         openCreateEditor();
                       }}
                       className="primary-button w-full justify-center"
@@ -1016,12 +1254,16 @@ export default function AtelierVaultPage({
                       type="button"
                       onClick={() => {
                         setMobileAdminMenuOpen(false);
-                        void loadInsights();
+                        if (activeView === 'orders') {
+                          void loadCheckoutOrders();
+                        } else {
+                          void loadInsights();
+                        }
                       }}
                       className="secondary-button w-full justify-center"
-                      disabled={insightsLoading}
+                      disabled={activeView === 'orders' ? checkoutOrdersLoading : insightsLoading}
                     >
-                      {insightsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {(activeView === 'orders' ? checkoutOrdersLoading : insightsLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                       {insightsUi.refresh}
                     </button>
                     <button type="button" onClick={handleLogout} className="secondary-button w-full justify-center">
@@ -1052,6 +1294,18 @@ export default function AtelierVaultPage({
                     className={activeView === 'insights' ? 'primary-button' : 'secondary-button'}
                   >
                     {insightsUi.insightsTab}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveView('orders');
+                      if (!checkoutOrdersLoading) {
+                        void loadCheckoutOrders();
+                      }
+                    }}
+                    className={activeView === 'orders' ? 'primary-button' : 'secondary-button'}
+                  >
+                    {insightsUi.ordersTab}
                   </button>
                 </div>
               ) : null}
@@ -1144,8 +1398,10 @@ export default function AtelierVaultPage({
                       </div>
                     )}
                   </section>
-                ) : (
+                ) : activeView === 'insights' ? (
                   insightsView
+                ) : (
+                  checkoutOrdersView
                 )}
               </>
             )}
@@ -1307,35 +1563,54 @@ export default function AtelierVaultPage({
                         {coverFile ? <p className="text-xs text-[color:var(--text-muted)]">{ui.selectedFile(coverFile.name)}</p> : null}
                         {!coverFile && formState.coverImageUrl ? <p className="text-xs text-[color:var(--text-muted)]">{ui.keepingCurrentCover}</p> : null}
                       </Field>
-                      <Field label={ui.fullUpload}>
-                        <input type="file" accept="image/*" onChange={(event) => setFullFile(event.target.files?.[0] ?? null)} className="field-input file:mr-4 file:rounded-full file:border-0 file:bg-[color:var(--accent-soft)] file:px-4 file:py-2 file:text-sm file:text-[color:var(--text-primary)]" />
-                        {fullFile ? <p className="text-xs text-[color:var(--text-muted)]">{ui.selectedFile(fullFile.name)}</p> : null}
-                        {!fullFile && formState.imageUrl ? <p className="text-xs text-[color:var(--text-muted)]">{ui.keepingCurrentFull}</p> : null}
+                      <Field label={ui.sideUpload}>
+                        <input type="file" accept="image/*" onChange={(event) => setSideFile(event.target.files?.[0] ?? null)} className="field-input file:mr-4 file:rounded-full file:border-0 file:bg-[color:var(--accent-soft)] file:px-4 file:py-2 file:text-sm file:text-[color:var(--text-primary)]" />
+                        {sideFile ? <p className="text-xs text-[color:var(--text-muted)]">{ui.selectedFile(sideFile.name)}</p> : null}
+                        {!sideFile && formState.sideImageUrl ? <p className="text-xs text-[color:var(--text-muted)]">{ui.keepingCurrentSide}</p> : null}
                       </Field>
-                      <Field label={ui.coverUrl} span>
+                      <Field label={ui.backUpload}>
+                        <input type="file" accept="image/*" onChange={(event) => setBackFile(event.target.files?.[0] ?? null)} className="field-input file:mr-4 file:rounded-full file:border-0 file:bg-[color:var(--accent-soft)] file:px-4 file:py-2 file:text-sm file:text-[color:var(--text-primary)]" />
+                        {backFile ? <p className="text-xs text-[color:var(--text-muted)]">{ui.selectedFile(backFile.name)}</p> : null}
+                        {!backFile && formState.backImageUrl ? <p className="text-xs text-[color:var(--text-muted)]">{ui.keepingCurrentBack}</p> : null}
+                      </Field>
+                      <Field label={ui.coverUrl}>
                         <input value={formState.coverImageUrl} onChange={(event) => setFormState((current) => ({ ...current, coverImageUrl: event.target.value }))} className="field-input" />
                       </Field>
-                      <Field label={ui.fullUrl} span>
-                        <input value={formState.imageUrl} onChange={(event) => setFormState((current) => ({ ...current, imageUrl: event.target.value }))} className="field-input" />
+                      <Field label={ui.sideUrl}>
+                        <input value={formState.sideImageUrl} onChange={(event) => setFormState((current) => ({ ...current, sideImageUrl: event.target.value }))} className="field-input" />
+                      </Field>
+                      <Field label={ui.backUrl}>
+                        <input value={formState.backImageUrl} onChange={(event) => setFormState((current) => ({ ...current, backImageUrl: event.target.value }))} className="field-input" />
                       </Field>
 
-                      <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                      <div className="grid gap-4 md:col-span-2 md:grid-cols-3">
                         <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface)]">
                           {formState.coverImageUrl ? (
-                            <img src={formState.coverImageUrl} alt="Cover preview" className="h-72 w-full object-cover object-top" />
+                            <img src={formState.coverImageUrl} alt="Cover/front preview" className="aspect-[4/5] w-full object-contain object-top bg-[color:var(--surface-base)]" />
                           ) : (
-                            <div className="grid h-72 place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.coverPreview}</div>
+                            <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.coverPreview}</div>
                           )}
                         </div>
                         <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface)]">
-                          {formState.imageUrl ? (
+                          {formState.sideImageUrl ? (
                             <img
-                              src={formState.imageUrl}
-                              alt="Full preview"
+                              src={formState.sideImageUrl}
+                              alt="Side view preview"
                               className="aspect-[4/5] w-full object-contain object-top bg-[color:var(--surface-base)]"
                             />
                           ) : (
-                            <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.fullPreview}</div>
+                            <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.sidePreview}</div>
+                          )}
+                        </div>
+                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface)]">
+                          {formState.backImageUrl ? (
+                            <img
+                              src={formState.backImageUrl}
+                              alt="Back view preview"
+                              className="aspect-[4/5] w-full object-contain object-top bg-[color:var(--surface-base)]"
+                            />
+                          ) : (
+                            <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.backPreview}</div>
                           )}
                         </div>
                       </div>

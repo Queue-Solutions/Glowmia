@@ -2,6 +2,7 @@ import type { NextApiRequest } from 'next';
 import { DRESS_IMAGES_BUCKET } from '@/src/lib/adminSupabase';
 
 export type AdminDressPayload = {
+  id: string | null;
   name: string;
   nameAr: string | null;
   description: string;
@@ -23,6 +24,9 @@ export type AdminDressPayload = {
   fitAr: string | null;
   coverImageUrl: string;
   imageUrl: string;
+  frontViewUrl: string;
+  sideViewUrl: string;
+  backViewUrl: string;
 };
 
 function asText(value: unknown) {
@@ -46,6 +50,7 @@ function asTagList(value: unknown) {
 
 export function validateAdminDressPayload(body: NextApiRequest['body']): { payload: AdminDressPayload | null; error: string | null } {
   const payload: AdminDressPayload = {
+    id: asOptionalText(body?.id),
     name: asText(body?.name),
     nameAr: asOptionalText(body?.nameAr),
     description: asText(body?.description),
@@ -67,14 +72,20 @@ export function validateAdminDressPayload(body: NextApiRequest['body']): { paylo
     fitAr: asOptionalText(body?.fitAr),
     coverImageUrl: asText(body?.coverImageUrl),
     imageUrl: asText(body?.imageUrl),
+    frontViewUrl: asText(body?.frontViewUrl),
+    sideViewUrl: asText(body?.sideViewUrl),
+    backViewUrl: asText(body?.backViewUrl),
   };
+
+  payload.frontViewUrl = payload.frontViewUrl || payload.coverImageUrl;
+  payload.imageUrl = payload.imageUrl || payload.coverImageUrl;
 
   if (!payload.name || !payload.description) {
     return { payload: null, error: 'Name and description are required.' };
   }
 
-  if (!payload.coverImageUrl || !payload.imageUrl) {
-    return { payload: null, error: 'Cover image URL and full image URL are required.' };
+  if (!payload.coverImageUrl) {
+    return { payload: null, error: 'Cover/front image URL is required.' };
   }
 
   if (!payload.color || !payload.sleeveType || !payload.length || !payload.fabric || !payload.fit) {
@@ -94,6 +105,7 @@ export function validateAdminDressPayload(body: NextApiRequest['body']): { paylo
 
 export function toDressInsertPayload(payload: AdminDressPayload) {
   return {
+    ...(payload.id ? { id: payload.id } : {}),
     name: payload.name,
     name_ar: payload.nameAr,
     description: payload.description,
@@ -113,32 +125,54 @@ export function toDressInsertPayload(payload: AdminDressPayload) {
     fabric_ar: payload.fabricAr,
     fit: payload.fit,
     fit_ar: payload.fitAr,
-    cover_image_url: payload.coverImageUrl,
     image_url: payload.imageUrl,
+    front_view_url: payload.frontViewUrl,
+    side_view_url: payload.sideViewUrl || null,
+    back_view_url: payload.backViewUrl || null,
   };
 }
 
-export function extractStoragePathFromUrl(value: unknown) {
+const MANAGED_UPLOAD_BUCKETS = [DRESS_IMAGES_BUCKET] as const;
+
+export type ManagedUploadAsset = {
+  bucket: string;
+  path: string;
+};
+
+export function extractStorageAssetFromUrl(value: unknown): ManagedUploadAsset | null {
   if (typeof value !== 'string' || !value.trim()) {
     return null;
   }
 
   try {
     const url = new URL(value);
-    const marker = `/storage/v1/object/public/${DRESS_IMAGES_BUCKET}/`;
-    const index = url.pathname.indexOf(marker);
+    for (const bucket of MANAGED_UPLOAD_BUCKETS) {
+      const marker = `/storage/v1/object/public/${bucket}/`;
+      const index = url.pathname.indexOf(marker);
 
-    if (index === -1) {
-      return null;
+      if (index !== -1) {
+        return {
+          bucket,
+          path: decodeURIComponent(url.pathname.slice(index + marker.length)),
+        };
+      }
     }
 
-    return decodeURIComponent(url.pathname.slice(index + marker.length));
+    return null;
   } catch {
     return null;
   }
 }
 
+export function extractStoragePathFromUrl(value: unknown) {
+  return extractStorageAssetFromUrl(value)?.path ?? null;
+}
+
+export function getManagedUploadAsset(value: unknown) {
+  const asset = extractStorageAssetFromUrl(value);
+  return asset?.path.startsWith('admin-uploads/') || asset?.path.startsWith('dresses/') ? asset : null;
+}
+
 export function getManagedUploadPath(value: unknown) {
-  const storagePath = extractStoragePathFromUrl(value);
-  return storagePath?.startsWith('admin-uploads/') ? storagePath : null;
+  return getManagedUploadAsset(value)?.path ?? null;
 }

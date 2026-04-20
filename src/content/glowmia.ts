@@ -57,6 +57,50 @@ type CopyTree = {
     save: { en: string; ar: string };
     saved: { en: string; ar: string };
   };
+  cart: {
+    title: { en: string; ar: string };
+    description: { en: string; ar: string };
+    sizeLabel: { en: string; ar: string };
+    addToCart: { en: string; ar: string };
+    added: { en: string; ar: string };
+    viewCart: { en: string; ar: string };
+    emptyTitle: { en: string; ar: string };
+    emptyDescription: { en: string; ar: string };
+    continueShopping: { en: string; ar: string };
+    summaryTitle: { en: string; ar: string };
+    itemCount: { en: string; ar: string };
+    quantity: { en: string; ar: string };
+    remove: { en: string; ar: string };
+    clearCart: { en: string; ar: string };
+    fittingNote: { en: string; ar: string };
+    requestFitting: { en: string; ar: string };
+    checkout: { en: string; ar: string };
+  };
+  checkout: {
+    title: { en: string; ar: string };
+    description: { en: string; ar: string };
+    selectedTitle: { en: string; ar: string };
+    formTitle: { en: string; ar: string };
+    formDescription: { en: string; ar: string };
+    name: { en: string; ar: string };
+    phone: { en: string; ar: string };
+    phoneCode: { en: string; ar: string };
+    email: { en: string; ar: string };
+    country: { en: string; ar: string };
+    namePlaceholder: { en: string; ar: string };
+    phonePlaceholder: { en: string; ar: string };
+    emailPlaceholder: { en: string; ar: string };
+    countryPlaceholder: { en: string; ar: string };
+    submit: { en: string; ar: string };
+    submitting: { en: string; ar: string };
+    emptyTitle: { en: string; ar: string };
+    emptyDescription: { en: string; ar: string };
+    requiredError: { en: string; ar: string };
+    thankYouTitle: { en: string; ar: string };
+    thankYouDescription: { en: string; ar: string };
+    orderReference: { en: string; ar: string };
+    close: { en: string; ar: string };
+  };
   agent: {
     eyebrow: { en: string; ar: string };
     title: { en: string; ar: string };
@@ -181,6 +225,71 @@ export const glowmiaCopy: CopyTree = {
   favorites: {
     save: { en: 'Save', ar: 'حفظ' },
     saved: { en: 'Saved', ar: 'محفوظ' },
+  },
+  cart: {
+    title: { en: 'Cart', ar: 'السلة' },
+    description: {
+      en: 'Review your preferred Glowmia dresses, selected sizes, and quantities before sending a fitting request.',
+      ar: 'راجعي فساتين Glowmia المفضلة لديك والمقاسات والكميات قبل إرسال طلب القياس.',
+    },
+    sizeLabel: { en: 'Size', ar: 'المقاس' },
+    addToCart: { en: 'Add to cart', ar: 'إضافة إلى السلة' },
+    added: { en: 'Added', ar: 'تمت الإضافة' },
+    viewCart: { en: 'View cart', ar: 'عرض السلة' },
+    emptyTitle: { en: 'Your cart is empty', ar: 'سلتك فارغة' },
+    emptyDescription: {
+      en: 'Choose a dress from the design gallery, select a size, and it will appear here.',
+      ar: 'اختاري فستانًا من معرض التصاميم وحددي المقاس ليظهر هنا.',
+    },
+    continueShopping: { en: 'Continue shopping', ar: 'متابعة التسوق' },
+    summaryTitle: { en: 'Selection summary', ar: 'ملخص الاختيار' },
+    itemCount: { en: 'Items', ar: 'العناصر' },
+    quantity: { en: 'Quantity', ar: 'الكمية' },
+    remove: { en: 'Remove', ar: 'حذف' },
+    clearCart: { en: 'Clear cart', ar: 'إفراغ السلة' },
+    fittingNote: {
+      en: 'A Glowmia team member can use this selection to confirm availability, fit, and final details.',
+      ar: 'يمكن لفريق Glowmia استخدام هذا الاختيار لتأكيد التوفر والمقاس والتفاصيل النهائية.',
+    },
+    requestFitting: { en: 'Request fitting', ar: 'طلب القياس' },
+    checkout: { en: 'Checkout', ar: 'إتمام الطلب' },
+  },
+  checkout: {
+    title: { en: 'Checkout', ar: 'إتمام الطلب' },
+    description: {
+      en: 'Confirm your selected dresses and share your contact details so the Glowmia team can follow up.',
+      ar: 'أكدي الفساتين المختارة وشاركي بيانات التواصل ليتابع معك فريق Glowmia.',
+    },
+    selectedTitle: { en: 'Chosen dresses', ar: 'الفساتين المختارة' },
+    formTitle: { en: 'Contact details', ar: 'بيانات التواصل' },
+    formDescription: {
+      en: 'We will send this selection to the team by email and WhatsApp when notification settings are configured.',
+      ar: 'سنرسل هذا الاختيار إلى الفريق عبر البريد وواتساب عند ضبط إعدادات الإشعارات.',
+    },
+    name: { en: 'Name', ar: 'الاسم' },
+    phone: { en: 'Phone number', ar: 'رقم الهاتف' },
+    phoneCode: { en: 'Country code', ar: 'رمز الدولة' },
+    email: { en: 'Email', ar: 'البريد الإلكتروني' },
+    country: { en: 'Country / county', ar: 'البلد / المنطقة' },
+    namePlaceholder: { en: 'Your full name', ar: 'اسمك الكامل' },
+    phonePlaceholder: { en: '+20...', ar: '+20...' },
+    emailPlaceholder: { en: 'you@example.com', ar: 'you@example.com' },
+    countryPlaceholder: { en: 'Country or county', ar: 'البلد أو المنطقة' },
+    submit: { en: 'Send checkout request', ar: 'إرسال طلب الشراء' },
+    submitting: { en: 'Sending...', ar: 'جارٍ الإرسال...' },
+    emptyTitle: { en: 'No dresses selected yet', ar: 'لم يتم اختيار فساتين بعد' },
+    emptyDescription: {
+      en: 'Add your preferred dresses to the cart first, then return here to complete checkout.',
+      ar: 'أضيفي الفساتين المفضلة إلى السلة أولاً ثم عودي هنا لإتمام الطلب.',
+    },
+    requiredError: { en: 'Please fill all contact fields and keep at least one dress selected.', ar: 'يرجى تعبئة كل بيانات التواصل والإبقاء على فستان واحد على الأقل.' },
+    thankYouTitle: { en: 'Thank you for your request', ar: 'شكراً لطلبك' },
+    thankYouDescription: {
+      en: 'Your selected dresses and contact details were sent to the Glowmia team. We will follow up with you soon.',
+      ar: 'تم إرسال الفساتين المختارة وبيانات التواصل إلى فريق Glowmia. سنتواصل معك قريباً.',
+    },
+    orderReference: { en: 'Order reference', ar: 'رقم الطلب' },
+    close: { en: 'Close', ar: 'إغلاق' },
   },
   agent: {
     eyebrow: { en: 'Live now', ar: 'متاح الآن' },

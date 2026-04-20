@@ -2,7 +2,7 @@ import { getSupabaseClient, getSupabaseConfig } from '@/src/lib/supabase';
 import { normalizeDressRow, type Design, type DressRow } from '@/src/data/designs';
 import { fallbackDressRows } from '@/src/data/fallbackDesigns';
 
-const DRESS_SELECT_FIELDS = [
+const BASE_DRESS_SELECT_FIELDS = [
   'id',
   'name',
   'name_ar',
@@ -23,10 +23,21 @@ const DRESS_SELECT_FIELDS = [
   'fabric_ar',
   'fit',
   'fit_ar',
-  'cover_image_url',
   'image_url',
+  'front_view_url',
+  'side_view_url',
+  'back_view_url',
   'created_at',
+];
+
+const DRESS_SELECT_FIELDS = [
+  ...BASE_DRESS_SELECT_FIELDS,
+  'gallery_image_urls',
+  'gallery_images',
+  'image_urls',
 ].join(', ');
+
+const FALLBACK_DRESS_SELECT_FIELDS = BASE_DRESS_SELECT_FIELDS.join(', ');
 
 const DEFAULT_DESIGNS_CACHE_TTL_MS = 60_000;
 
@@ -56,14 +67,28 @@ async function loadDesignsFromSource() {
     return getFallbackDesigns();
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('dresses')
     .select(DRESS_SELECT_FIELDS)
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Failed to load dresses from Supabase:', error.message);
-    return getFallbackDesigns();
+    const missingGalleryColumn = /gallery_image_urls|gallery_images|image_urls/i.test(error.message);
+
+    if (missingGalleryColumn) {
+      const fallbackResponse = await supabase
+        .from('dresses')
+        .select(FALLBACK_DRESS_SELECT_FIELDS)
+        .order('created_at', { ascending: false });
+
+      data = fallbackResponse.data;
+      error = fallbackResponse.error;
+    }
+
+    if (error) {
+      console.error('Failed to load dresses from Supabase:', error.message);
+      return getFallbackDesigns();
+    }
   }
 
   const rows = (data ?? []) as DressRow[];

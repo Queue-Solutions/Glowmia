@@ -37,7 +37,7 @@ def add_message(data: Dict[str, Any]) -> None:
 
 
 def format_recommendation_dress(dress: Dict[str, Any]) -> Dict[str, Any]:
-    """Format a dress for recommendations by using cover image for display."""
+    """Format a dress for recommendations by using front image for display."""
     # Create a copy to avoid modifying the original
     formatted = dict(dress)
     
@@ -47,9 +47,9 @@ def format_recommendation_dress(dress: Dict[str, Any]) -> Dict[str, Any]:
         if "detail_image_url" not in formatted or not formatted.get("detail_image_url"):
             formatted["detail_image_url"] = formatted["image_url"]
     
-    # Use cover_image_url for display ( with fallback to image_url if cover doesn't exist)
-    if formatted.get("cover_image_url"):
-        formatted["image_url"] = formatted["cover_image_url"]
+    # Use front_view_url for display (with fallback to image_url if front doesn't exist)
+    if formatted.get("front_view_url"):
+        formatted["image_url"] = formatted["front_view_url"]
     
     return formatted
 
