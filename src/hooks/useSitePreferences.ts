@@ -7,7 +7,7 @@ const LANGUAGE_KEY = 'glowmia:language';
 const THEME_KEY = 'glowmia:theme';
 
 export function useSitePreferences() {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>('ar');
   const [darkMode, setDarkMode] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 

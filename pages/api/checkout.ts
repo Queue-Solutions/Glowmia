@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
-import { localizeText } from '@/src/data/designs';
-import { addCheckoutOrder, type StoredCheckoutItem, type StoredCheckoutNotifications } from '@/src/lib/checkoutStore';
+import { createCheckoutOrders, getSavedDesignById, markSavedDesignOrdered, type CheckoutOrderRecord } from '@/src/lib/glowmiaOrders';
 
 type CheckoutItemInput = {
   designId?: unknown;
@@ -13,10 +12,14 @@ type CheckoutRequestBody = {
   customer?: {
     name?: unknown;
     phone?: unknown;
-    email?: unknown;
-    country?: unknown;
+    address?: unknown;
+    city?: unknown;
   };
   items?: unknown;
+  notes?: unknown;
+  savedDesignId?: unknown;
+  userId?: unknown;
+  guestId?: unknown;
 };
 
 type NotificationResult = {
@@ -24,13 +27,14 @@ type NotificationResult = {
   error?: string;
 };
 
+type CheckoutOrderItem = CheckoutOrderRecord['items'][number];
+
 const VALID_SIZES = new Set(['S', 'M', 'L']);
-const MAX_CUSTOMER_FIELD_LENGTH = 160;
+const MAX_FIELD_LENGTH = 300;
 const MAX_ITEMS = 30;
 const DEFAULT_CHECKOUT_EMAIL_TO = 'queuesolutions25@gmail.com';
-const DEFAULT_WHATSAPP_TO = '201090911069';
 
-function readTrimmedString(value: unknown, maxLength = MAX_CUSTOMER_FIELD_LENGTH) {
+function readTrimmedString(value: unknown, maxLength = MAX_FIELD_LENGTH) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
@@ -44,7 +48,7 @@ function readCheckoutItems(value: unknown) {
     .map((rawItem) => {
       const item = rawItem as CheckoutItemInput;
       const designId = readTrimmedString(item?.designId, 200);
-      const size = readTrimmedString(item?.size, 4);
+      const size = readTrimmedString(item?.size, 24);
       const quantity = Math.max(1, Math.min(99, Math.round(Number(item?.quantity) || 1)));
 
       if (!designId || !VALID_SIZES.has(size)) {
@@ -53,138 +57,89 @@ function readCheckoutItems(value: unknown) {
 
       return {
         designId,
-        size: size as 'S' | 'M' | 'L',
+        size,
         quantity,
       };
     })
-    .filter((item): item is { designId: string; size: 'S' | 'M' | 'L'; quantity: number } => Boolean(item));
+    .filter((item): item is { designId: string; size: string; quantity: number } => Boolean(item));
 }
 
-function getBaseUrl(request: NextApiRequest) {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-
-  if (configured) {
-    return configured.replace(/\/$/, '');
-  }
-
-  const proto = request.headers['x-forwarded-proto'] || 'http';
-  const host = request.headers.host || 'localhost:3001';
-  return `${Array.isArray(proto) ? proto[0] : proto}://${host}`;
+function formatMultiValueField(values: Array<string | null | undefined>) {
+  const normalized = values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
+  return normalized.length > 0 ? normalized.join('\n') : '';
 }
 
-function formatOrderMessage(input: {
-  orderId?: string;
-  customer: { name: string; phone: string; email: string; country: string };
-  items: StoredCheckoutItem[];
-  baseUrl: string;
+function buildFormSubmitPayload(input: {
+  orderReference: string;
+  customer: { name: string; phone: string; address: string; city: string };
+  notes: string;
+  items: CheckoutOrderItem[];
 }) {
-  const totalItems = input.items.reduce((sum, item) => sum + item.quantity, 0);
-  const itemLines = input.items
-    .map((item, index) => {
-      const designUrl = `${input.baseUrl}/designs/${item.slug}`;
-      return [
-        `${index + 1}) ${item.designName}`,
-        `   Dress ID: ${item.designId}`,
-        `   Size: ${item.size}`,
-        `   Qty: ${item.quantity}`,
-        `   Link: ${designUrl}`,
-      ].join('\n');
-    })
-    .join('\n\n');
+  const payload = new URLSearchParams();
 
-  return [
-    'GLOWMIA CHECKOUT RECEIPT',
-    '========================',
-    input.orderId ? `Receipt No: ${input.orderId}` : null,
-    `Date: ${new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' })}`,
-    `Total items: ${totalItems}`,
-    '',
-    'CUSTOMER CREDENTIALS',
-    '--------------------',
-    `Full name: ${input.customer.name}`,
-    `Phone number: ${input.customer.phone}`,
-    `Email address: ${input.customer.email}`,
-    `Country / county: ${input.customer.country}`,
-    '',
-    'CHOSEN DRESSES',
-    '--------------',
-    itemLines,
-    '',
-    'Please contact the customer to confirm availability, sizing, and final details.',
-  ]
-    .filter((line) => line !== null)
-    .join('\n');
+  payload.set('_subject', 'New Glowmia Order');
+  payload.set('_template', 'table');
+  payload.set('_captcha', 'false');
+
+  payload.set('order_reference', input.orderReference);
+  payload.set('customer_name', input.customer.name);
+  payload.set('phone', input.customer.phone);
+  payload.set('email', '');
+  payload.set('address', input.customer.address);
+  payload.set('city', input.customer.city);
+  payload.set('notes', input.notes);
+  payload.set('dress_id', formatMultiValueField(input.items.map((item) => item.designId)));
+  payload.set('dress_name', formatMultiValueField(input.items.map((item) => item.designName)));
+  payload.set('size', formatMultiValueField(input.items.map((item) => item.size || 'custom')));
+  payload.set('color', formatMultiValueField(input.items.map((item) => item.color || '')));
+  payload.set('quantity', formatMultiValueField(input.items.map((item) => String(item.quantity))));
+  payload.set('saved_design_id', formatMultiValueField(input.items.map((item) => item.savedDesignId || '')));
+  payload.set('edited_image_url', formatMultiValueField(input.items.map((item) => item.editedImageUrl || '')));
+  payload.set('order_total', '');
+  payload.set('front_view_url', formatMultiValueField(input.items.map((item) => item.frontViewUrl)));
+  payload.set('side_view_url', formatMultiValueField(input.items.map((item) => item.sideViewUrl || '')));
+  payload.set('back_view_url', formatMultiValueField(input.items.map((item) => item.backViewUrl || '')));
+  payload.set(
+    'items_summary',
+    input.items
+      .map((item, index) =>
+        [
+          `${index + 1}. ${item.designName}`,
+          `Dress ID: ${item.designId}`,
+          `Size: ${item.size || 'custom'}`,
+          `Color: ${item.color || '-'}`,
+          `Quantity: ${item.quantity}`,
+          `Saved design ID: ${item.savedDesignId || '-'}`,
+          `Edited image: ${item.editedImageUrl || '-'}`,
+        ].join(' | '),
+      )
+      .join('\n'),
+  );
+
+  return payload;
 }
 
-async function sendEmail(message: string, customerEmail: string): Promise<NotificationResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+async function sendEmailViaFormSubmit(payload: URLSearchParams): Promise<NotificationResult> {
   const to = process.env.CHECKOUT_EMAIL_TO?.trim() || DEFAULT_CHECKOUT_EMAIL_TO;
-  const from = process.env.CHECKOUT_EMAIL_FROM?.trim();
-
-  if (!apiKey || !from) {
-    return { status: 'skipped' };
-  }
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    const apiResponse = await fetch(`https://formsubmit.co/${encodeURIComponent(to)}`, {
       method: 'POST',
+      redirect: 'manual',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
       },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        reply_to: customerEmail,
-        subject: 'Glowmia checkout receipt',
-        text: message,
-      }),
+      body: payload.toString(),
     });
 
-    if (!response.ok) {
-      return { status: 'failed', error: await response.text() };
+    if (apiResponse.status >= 400) {
+      return { status: 'failed', error: await apiResponse.text() };
     }
 
     return { status: 'sent' };
   } catch (error) {
     return { status: 'failed', error: error instanceof Error ? error.message : 'Unable to send email.' };
-  }
-}
-
-async function sendWhatsapp(message: string): Promise<NotificationResult> {
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
-  const to = (process.env.WHATSAPP_TO?.trim() || DEFAULT_WHATSAPP_TO).replace(/[^\d]/g, '');
-
-  if (!accessToken || !phoneNumberId) {
-    return { status: 'skipped' };
-  }
-
-  try {
-    const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to,
-        type: 'text',
-        text: {
-          preview_url: true,
-          body: message,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      return { status: 'failed', error: await response.text() };
-    }
-
-    return { status: 'sent' };
-  } catch (error) {
-    return { status: 'failed', error: error instanceof Error ? error.message : 'Unable to send WhatsApp message.' };
   }
 }
 
@@ -201,74 +156,126 @@ export default async function handler(request: NextApiRequest, response: NextApi
   const customer = {
     name: readTrimmedString(body.customer?.name),
     phone: readTrimmedString(body.customer?.phone),
-    email: readTrimmedString(body.customer?.email),
-    country: readTrimmedString(body.customer?.country),
+    address: readTrimmedString(body.customer?.address),
+    city: readTrimmedString(body.customer?.city),
   };
+  const notes = readTrimmedString(body.notes, 1000);
+  const userId = readTrimmedString(body.userId, 200) || null;
+  const guestId = readTrimmedString(body.guestId, 200) || null;
+  const savedDesignId = readTrimmedString(body.savedDesignId, 200);
   const itemInputs = readCheckoutItems(body.items);
 
-  if (!customer.name || !customer.phone || !customer.email || !customer.country) {
-    response.status(400).json({ error: 'Name, phone number, email, and country/county are required.' });
+  if (!customer.name || !customer.phone || !customer.address || !customer.city) {
+    response.status(400).json({ error: 'Name, phone, address, and city are required.' });
     return;
   }
 
-  if (!customer.email.includes('@')) {
-    response.status(400).json({ error: 'A valid email address is required.' });
-    return;
-  }
-
-  if (itemInputs.length === 0) {
+  if (itemInputs.length === 0 && !savedDesignId) {
     response.status(400).json({ error: 'At least one selected dress is required.' });
     return;
   }
 
-  const designs = await getAllDesignsFromSupabase();
-  const designsById = new Map(designs.map((design) => [design.id, design]));
-  const items: StoredCheckoutItem[] = itemInputs
-    .map((item) => {
+  try {
+    const designs = await getAllDesignsFromSupabase();
+    const designsById = new Map(designs.map((design) => [design.id, design]));
+    const cartItems = itemInputs.reduce<CheckoutOrderItem[]>((accumulator, item) => {
       const design = designsById.get(item.designId);
 
       if (!design) {
-        return null;
+        return accumulator;
       }
 
-      return {
+      accumulator.push({
         designId: item.designId,
-        designName: localizeText('en', design.name),
-        slug: design.slug,
+        designName: design.name.ar || design.name.en,
         size: item.size,
         quantity: item.quantity,
         imageUrl: design.coverImage,
+        frontViewUrl: design.coverImage,
+        sideViewUrl: design.galleryImages[1] || design.coverImage,
+        backViewUrl: design.galleryImages[2] || design.galleryImages[1] || design.coverImage,
+        color: design.color.ar || design.color.en,
+      });
+
+      return accumulator;
+    }, []);
+
+    let savedDesign = null;
+    let savedDesignItem: CheckoutOrderItem | null = null;
+
+    if (savedDesignId) {
+      savedDesign = await getSavedDesignById(savedDesignId);
+
+      if (!savedDesign) {
+        response.status(404).json({ error: 'The saved design could not be found.' });
+        return;
+      }
+
+      if (savedDesign.isOrdered) {
+        response.status(409).json({ error: 'This saved design has already been linked to an order.' });
+        return;
+      }
+
+      const originalDress = designsById.get(savedDesign.dressId) ?? null;
+      savedDesignItem = {
+        designId: savedDesign.dressId,
+        designName: originalDress?.name.ar || savedDesign.designName || originalDress?.name.en || 'تصميم محفوظ',
+        size: null,
+        quantity: 1,
+        imageUrl: savedDesign.editedImageUrl || savedDesign.originalImageUrl,
+        frontViewUrl: savedDesign.editedImageUrl || savedDesign.originalImageUrl,
+        sideViewUrl: originalDress?.galleryImages[1] || originalDress?.coverImage || savedDesign.originalImageUrl,
+        backViewUrl: originalDress?.galleryImages[2] || originalDress?.galleryImages[1] || originalDress?.coverImage || savedDesign.originalImageUrl,
+        color: originalDress?.color.ar || originalDress?.color.en || null,
+        savedDesignId: savedDesign.id,
+        originalImageUrl: savedDesign.originalImageUrl,
+        editedImageUrl: savedDesign.editedImageUrl,
       };
-    })
-    .filter((item): item is StoredCheckoutItem => Boolean(item));
+    }
 
-  if (items.length === 0) {
-    response.status(400).json({ error: 'The selected dresses are no longer available.' });
-    return;
+    const items = savedDesignItem ? [savedDesignItem, ...cartItems] : cartItems;
+
+    if (items.length === 0) {
+      response.status(400).json({ error: 'The selected dresses are no longer available.' });
+      return;
+    }
+
+    const createdOrders = await createCheckoutOrders({
+      customer,
+      items,
+      notes,
+      userId: savedDesign?.userId || userId,
+      guestId: savedDesign?.guestId || guestId,
+      status: 'pending',
+    });
+
+    const orderReference = createdOrders[0]?.id || '';
+
+    if (savedDesign?.id && orderReference) {
+      await markSavedDesignOrdered(savedDesign.id, orderReference);
+    }
+
+    const emailPayload = buildFormSubmitPayload({
+      orderReference,
+      customer,
+      notes,
+      items,
+    });
+    const emailResult = await sendEmailViaFormSubmit(emailPayload);
+
+    if (emailResult.status === 'failed') {
+      console.error('FormSubmit order email failed:', emailResult.error || 'Unknown FormSubmit error.');
+    }
+
+    response.status(201).json({
+      ok: true,
+      orderId: orderReference,
+      emailStatus: emailResult.status,
+      emailError: emailResult.status === 'failed' ? emailResult.error || 'Unable to send order email.' : null,
+    });
+  } catch (error) {
+    response.status(500).json({
+      error: error instanceof Error ? error.message : 'Unable to place the order.',
+    });
   }
-
-  const baseUrl = getBaseUrl(request);
-  const orderId = `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const message = formatOrderMessage({ orderId, customer, items, baseUrl });
-  const [emailResult, whatsappResult] = await Promise.all([
-    sendEmail(message, customer.email),
-    sendWhatsapp(message),
-  ]);
-  const notifications: StoredCheckoutNotifications = {
-    email: emailResult.status,
-    whatsapp: whatsappResult.status,
-  };
-
-  const order = await addCheckoutOrder({
-    id: orderId,
-    customer,
-    items,
-    notifications,
-  });
-
-  response.status(201).json({
-    ok: true,
-    orderId: order.id,
-    notifications,
-  });
 }

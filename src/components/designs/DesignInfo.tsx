@@ -59,7 +59,7 @@ export function DesignInfo({ design }: { design: Design }) {
         </button>
       </div>
 
-      <section className="cart-detail-panel">
+      <section className="cart-detail-panel cart-detail-panel--merged">
         <div>
           <p className="text-sm uppercase tracking-[0.24em] text-[color:var(--text-muted)]">
             {copyFor(language, glowmiaCopy.cart.sizeLabel)}

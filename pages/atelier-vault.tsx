@@ -429,19 +429,19 @@ export default function AtelierVaultPage({
           emptyInsights: 'لا توجد بيانات تفاعل بعد.',
           customerName: 'الاسم',
           customerPhone: 'الهاتف',
-          customerEmail: 'البريد',
-          customerCountry: 'البلد',
+          customerAddress: 'العنوان',
+          customerCity: 'المدينة',
+          orderNotes: 'الملاحظات',
+          orderStatus: 'الحالة',
           viewDesign: 'عرض التصميم',
           checkoutOrdersTitle: 'طلبات الشراء',
           checkoutOrdersDescription: 'راجعي طلبات صفحة الدفع مع بيانات العميل والفساتين المختارة.',
           noCheckoutOrders: 'لا توجد طلبات شراء بعد.',
           orderReference: 'رقم الطلب',
-          notificationStatus: 'الإشعارات',
-          email: 'البريد',
-          whatsapp: 'واتساب',
           size: 'المقاس',
           quantity: 'الكمية',
           dressId: 'رقم التصميم',
+          color: 'اللون',
         }
       : {
           catalogTab: 'Catalog',
@@ -470,19 +470,19 @@ export default function AtelierVaultPage({
           emptyInsights: 'No engagement data yet.',
           customerName: 'Name',
           customerPhone: 'Phone',
-          customerEmail: 'Email',
-          customerCountry: 'Country',
+          customerAddress: 'Address',
+          customerCity: 'City',
+          orderNotes: 'Notes',
+          orderStatus: 'Status',
           viewDesign: 'View design',
           checkoutOrdersTitle: 'Checkout orders',
           checkoutOrdersDescription: 'Review checkout-page orders with buyer credentials and selected dresses.',
           noCheckoutOrders: 'No checkout orders yet.',
           orderReference: 'Order reference',
-          notificationStatus: 'Notifications',
-          email: 'Email',
-          whatsapp: 'WhatsApp',
           size: 'Size',
           quantity: 'Qty',
           dressId: 'Design ID',
+          color: 'Color',
         };
 
   const [catalogDesigns, setCatalogDesigns] = useState(designs);
@@ -1046,28 +1046,33 @@ export default function AtelierVaultPage({
                         {order.customer.phone}
                       </p>
                       <p>
-                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerEmail}:</span>{' '}
-                        <a href={`mailto:${order.customer.email}`} className="underline-offset-4 hover:underline">{order.customer.email}</a>
+                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerAddress}:</span>{' '}
+                        {order.customer.address}
                       </p>
                       <p>
-                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerCountry}:</span>{' '}
-                        {order.customer.country}
+                        <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerCity}:</span>{' '}
+                        {order.customer.city}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       <span className="eyebrow-chip !px-3 !py-2 !text-[0.65rem]">
-                        {insightsUi.email}: {order.notifications.email}
-                      </span>
-                      <span className="eyebrow-chip !px-3 !py-2 !text-[0.65rem]">
-                        {insightsUi.whatsapp}: {order.notifications.whatsapp}
+                        {insightsUi.orderStatus}: {order.status}
                       </span>
                     </div>
+                    {order.notes ? (
+                      <div className="grid gap-2 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 text-sm text-[color:var(--text-muted)]">
+                        <p>
+                          <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.orderNotes}:</span>{' '}
+                          {order.notes}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="grid gap-3">
                     {order.items.map((item) => (
-                      <article key={`${order.id}-${item.designId}-${item.size}`} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
+                      <article key={`${order.id}-${item.designId}-${item.size ?? 'custom'}`} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
                         <button
                           type="button"
                           onClick={() => setOrderPreview({ src: item.imageUrl, alt: item.designName })}
@@ -1089,12 +1094,19 @@ export default function AtelierVaultPage({
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-base)] px-3 py-1 text-xs text-[color:var(--text-muted)]">
-                              {insightsUi.size}: {item.size}
-                            </span>
+                            {item.size ? (
+                              <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-base)] px-3 py-1 text-xs text-[color:var(--text-muted)]">
+                                {insightsUi.size}: {item.size}
+                              </span>
+                            ) : null}
                             <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-base)] px-3 py-1 text-xs text-[color:var(--text-muted)]">
                               {insightsUi.quantity}: {item.quantity}
                             </span>
+                            {item.color ? (
+                              <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--surface-base)] px-3 py-1 text-xs text-[color:var(--text-muted)]">
+                                {insightsUi.color}: {item.color}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </article>

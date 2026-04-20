@@ -491,14 +491,22 @@ a {
   transition: color 140ms ease;
 }
 
+.design-card-shell {
+  overflow: hidden;
+  border-radius: 2rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
 .design-card__image {
   position: relative;
   aspect-ratio: 4 / 5;
-  border-radius: 1.8rem;
+  border-radius: 0;
   overflow: hidden;
   background: rgba(239, 228, 219, 0.42);
-  box-shadow: var(--shadow-soft);
-  transition: background-color 160ms ease, box-shadow 160ms ease, transform 140ms ease;
+  box-shadow: none;
+  transition: background-color 160ms ease, transform 140ms ease;
 }
 
 .design-card__image-stage {
@@ -586,6 +594,15 @@ a {
   backdrop-filter: blur(10px);
 }
 
+.cart-card-controls--merged {
+  margin-top: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-elevated) 96%, transparent));
+  box-shadow: none;
+}
+
 .cart-size-group {
   display: flex;
   align-items: center;
@@ -655,6 +672,11 @@ a {
   background: var(--surface-elevated);
   padding: 1rem;
   box-shadow: var(--shadow-soft);
+}
+
+.cart-detail-panel--merged {
+  overflow: hidden;
+  border-radius: 1.8rem;
 }
 
 .cart-line-item {

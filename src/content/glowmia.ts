@@ -85,12 +85,18 @@ type CopyTree = {
     name: { en: string; ar: string };
     phone: { en: string; ar: string };
     phoneCode: { en: string; ar: string };
-    email: { en: string; ar: string };
-    country: { en: string; ar: string };
+    email?: { en: string; ar: string };
+    country?: { en: string; ar: string };
+    address: { en: string; ar: string };
+    city: { en: string; ar: string };
+    notes: { en: string; ar: string };
     namePlaceholder: { en: string; ar: string };
     phonePlaceholder: { en: string; ar: string };
-    emailPlaceholder: { en: string; ar: string };
-    countryPlaceholder: { en: string; ar: string };
+    emailPlaceholder?: { en: string; ar: string };
+    countryPlaceholder?: { en: string; ar: string };
+    addressPlaceholder: { en: string; ar: string };
+    cityPlaceholder: { en: string; ar: string };
+    notesPlaceholder: { en: string; ar: string };
     submit: { en: string; ar: string };
     submitting: { en: string; ar: string };
     emptyTitle: { en: string; ar: string };
@@ -261,32 +267,34 @@ export const glowmiaCopy: CopyTree = {
       ar: 'أكدي الفساتين المختارة وشاركي بيانات التواصل ليتابع معك فريق Glowmia.',
     },
     selectedTitle: { en: 'Chosen dresses', ar: 'الفساتين المختارة' },
-    formTitle: { en: 'Contact details', ar: 'بيانات التواصل' },
+    formTitle: { en: 'Order details', ar: 'بيانات الطلب' },
     formDescription: {
-      en: 'We will send this selection to the team by email and WhatsApp when notification settings are configured.',
-      ar: 'سنرسل هذا الاختيار إلى الفريق عبر البريد وواتساب عند ضبط إعدادات الإشعارات.',
+      en: 'We will send this order to the Glowmia team email after you confirm your details.',
+      ar: 'سنرسل هذا الطلب إلى بريد فريق Glowmia بعد تأكيد بياناتك.',
     },
     name: { en: 'Name', ar: 'الاسم' },
     phone: { en: 'Phone number', ar: 'رقم الهاتف' },
     phoneCode: { en: 'Country code', ar: 'رمز الدولة' },
-    email: { en: 'Email', ar: 'البريد الإلكتروني' },
-    country: { en: 'Country / county', ar: 'البلد / المنطقة' },
+    address: { en: 'Address', ar: 'العنوان' },
+    city: { en: 'City', ar: 'المدينة' },
+    notes: { en: 'Notes', ar: 'ملاحظات' },
     namePlaceholder: { en: 'Your full name', ar: 'اسمك الكامل' },
     phonePlaceholder: { en: '+20...', ar: '+20...' },
-    emailPlaceholder: { en: 'you@example.com', ar: 'you@example.com' },
-    countryPlaceholder: { en: 'Country or county', ar: 'البلد أو المنطقة' },
-    submit: { en: 'Send checkout request', ar: 'إرسال طلب الشراء' },
+    addressPlaceholder: { en: 'Street and building details', ar: 'الشارع وتفاصيل العنوان' },
+    cityPlaceholder: { en: 'Your city', ar: 'اسم المدينة' },
+    notesPlaceholder: { en: 'Anything to mention about the order?', ar: 'هل توجد أي ملاحظات على الطلب؟' },
+    submit: { en: 'Send order', ar: 'إرسال الطلب' },
     submitting: { en: 'Sending...', ar: 'جارٍ الإرسال...' },
     emptyTitle: { en: 'No dresses selected yet', ar: 'لم يتم اختيار فساتين بعد' },
     emptyDescription: {
       en: 'Add your preferred dresses to the cart first, then return here to complete checkout.',
       ar: 'أضيفي الفساتين المفضلة إلى السلة أولاً ثم عودي هنا لإتمام الطلب.',
     },
-    requiredError: { en: 'Please fill all contact fields and keep at least one dress selected.', ar: 'يرجى تعبئة كل بيانات التواصل والإبقاء على فستان واحد على الأقل.' },
-    thankYouTitle: { en: 'Thank you for your request', ar: 'شكراً لطلبك' },
+    requiredError: { en: 'Please fill the required order fields and keep at least one dress selected.', ar: 'يرجى تعبئة حقول الطلب المطلوبة والإبقاء على فستان واحد على الأقل.' },
+    thankYouTitle: { en: 'Thank you for your order', ar: 'شكراً لطلبك' },
     thankYouDescription: {
-      en: 'Your selected dresses and contact details were sent to the Glowmia team. We will follow up with you soon.',
-      ar: 'تم إرسال الفساتين المختارة وبيانات التواصل إلى فريق Glowmia. سنتواصل معك قريباً.',
+      en: 'Your order details were sent to the Glowmia team. We will contact you soon.',
+      ar: 'تم إرسال تفاصيل طلبك إلى فريق Glowmia وسنتواصل معك قريباً.',
     },
     orderReference: { en: 'Order reference', ar: 'رقم الطلب' },
     close: { en: 'Close', ar: 'إغلاق' },

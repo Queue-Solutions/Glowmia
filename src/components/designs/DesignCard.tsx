@@ -46,7 +46,7 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
   const itemAlreadyInCart = hasItem(design.id, selectedSize);
 
   return (
-    <motion.article whileHover={{ y: -4 }} transition={{ duration: 0.22, ease: 'easeOut' }} className="group relative">
+    <motion.article whileHover={{ y: -4 }} transition={{ duration: 0.22, ease: 'easeOut' }} className="group relative design-card-shell">
       <button
         type="button"
         onClick={handleFavoriteToggle}
@@ -99,7 +99,7 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
         </div>
       </Link>
 
-      <div className="cart-card-controls">
+      <div className="cart-card-controls cart-card-controls--merged">
         <div className="cart-size-group" aria-label={copyFor(language, glowmiaCopy.cart.sizeLabel)}>
           <span className="cart-size-label">{copyFor(language, glowmiaCopy.cart.sizeLabel)}</span>
           <div className="cart-size-options">

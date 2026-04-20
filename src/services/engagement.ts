@@ -1,3 +1,5 @@
+import { getSupabaseClient } from '@/src/lib/supabase';
+
 export type DesignFeedbackEntry = {
   id: string;
   designId: string;
@@ -29,6 +31,21 @@ export type SavedDesignOrderEntry = {
   createdAt: string;
 };
 
+export type SavedDesignEntry = {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  dressId: string;
+  orderId: string | null;
+  originalImageUrl: string;
+  editedImageUrl: string;
+  prompt: string;
+  designName: string;
+  notes: string;
+  isOrdered: boolean;
+  createdAt: string;
+};
+
 export type AdminInsights = {
   designLikes: Array<{
     designId: string;
@@ -53,21 +70,22 @@ export type CheckoutOrderEntry = {
   customer: {
     name: string;
     phone: string;
-    email: string;
-    country: string;
+    address: string;
+    city: string;
   };
   items: Array<{
     designId: string;
     designName: string;
-    slug: string;
-    size: 'S' | 'M' | 'L';
+    size: string | null;
     quantity: number;
     imageUrl: string;
+    frontViewUrl: string;
+    sideViewUrl: string;
+    backViewUrl: string;
+    color: string | null;
   }>;
-  notifications: {
-    email: 'sent' | 'skipped' | 'failed';
-    whatsapp: 'sent' | 'skipped' | 'failed';
-  };
+  notes: string;
+  status: string;
   createdAt: string;
 };
 
@@ -126,15 +144,60 @@ export async function submitAgentFeedback(input: {
 export async function submitSavedDesignOrder(input: {
   sessionId: string | null;
   language: 'en' | 'ar';
-  customerName: string;
-  customerPhone: string;
+  customerName?: string;
+  customerPhone?: string;
+  userId?: string | null;
+  guestId?: string | null;
   dressId: string;
   dressName: string;
   originalImageUrl: string;
   editedImageUrl: string;
+  prompt?: string;
 }) {
-  const payload = await postJson<{ order: SavedDesignOrderEntry }>('/api/engagement/agent-design-order', input);
-  return payload.order;
+  const payload = await postJson<{ savedDesign: SavedDesignEntry }>('/api/engagement/agent-design-order', input);
+  return payload.savedDesign;
+}
+
+export async function fetchSavedDesign(savedDesignId: string) {
+  const response = await fetch(`/api/engagement/saved-design?id=${encodeURIComponent(savedDesignId)}`);
+  const payload = (await response.json()) as { savedDesign?: SavedDesignEntry | null; error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? 'Unable to load the saved design.');
+  }
+
+  return payload.savedDesign ?? null;
+}
+
+export async function resolveViewerIdentity() {
+  const guestStorageKey = 'glowmia:guest-id';
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    const { data, error } = await supabase.auth.getUser();
+
+    if (!error && data.user?.id) {
+      return { userId: data.user.id, guestId: null };
+    }
+  }
+
+  if (typeof window === 'undefined') {
+    return { userId: null, guestId: null };
+  }
+
+  const existingGuestId = window.localStorage.getItem(guestStorageKey)?.trim();
+
+  if (existingGuestId) {
+    return { userId: null, guestId: existingGuestId };
+  }
+
+  const nextGuestId =
+    typeof window.crypto?.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : `guest-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  window.localStorage.setItem(guestStorageKey, nextGuestId);
+  return { userId: null, guestId: nextGuestId };
 }
 
 export async function fetchAdminInsights() {

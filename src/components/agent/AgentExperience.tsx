@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useRouter } from 'next/router';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowUpRight,
@@ -24,7 +25,7 @@ import {
   type AgentDress,
   type AgentEditResponse,
 } from '@/src/services/glowmiaAgent';
-import { submitAgentFeedback, submitSavedDesignOrder } from '@/src/services/engagement';
+import { resolveViewerIdentity, submitAgentFeedback, submitSavedDesignOrder } from '@/src/services/engagement';
 
 type AgentMode = 'recommend' | 'edit';
 
@@ -46,7 +47,7 @@ type AgentEditMessage = {
   id: string;
   role: 'assistant';
   type: 'edit';
-  data: AgentEditResponse & { dressName: string };
+  data: AgentEditResponse & { dressName: string; prompt?: string };
 };
 
 type AgentMessage = AgentTextMessage | AgentRecommendationMessage | AgentEditMessage;
@@ -308,6 +309,7 @@ function getEditingImageUrl(dress: AgentDress) {
 }
 
 export function AgentExperience() {
+  const router = useRouter();
   const { language } = useSitePreferencesContext();
   const copy = copyByLanguage[language];
 
@@ -561,7 +563,8 @@ export function AgentExperience() {
             type: 'edit',
             data: {
               ...response,
-              dressName: localizeDressName(selectedDress, language),
+              dressName: selectedDress.name_ar?.trim() || localizeDressName(selectedDress, language),
+              prompt: trimmed,
             },
           });
           setSaveTargetMessageId(null);
@@ -643,30 +646,36 @@ export function AgentExperience() {
     const customerName = saveCustomerName.trim();
     const customerPhone = saveCustomerPhone.trim();
 
-    if (!customerName || !customerPhone) {
-      setSaveState('error');
-      setSaveError(copy.saveDesignRequired);
-      return;
-    }
-
     setSaveState('saving');
     setSaveError('');
 
     try {
-      await submitSavedDesignOrder({
+      const identity = await resolveViewerIdentity();
+      const savedDesign = await submitSavedDesignOrder({
         sessionId,
         language,
         customerName,
         customerPhone,
+        userId: identity.userId,
+        guestId: identity.guestId,
         dressId: message.data.dress_id,
         dressName: message.data.dressName,
         originalImageUrl: message.data.original_image_url,
         editedImageUrl: message.data.edited_image_url || message.data.original_image_url,
+        prompt: message.data.prompt || message.data.message || '',
       });
       setSaveState('saved');
       setSavedMessageIds((current) => (current.includes(message.id) ? current : [...current, message.id]));
       setHiddenSavePanelMessageIds((current) => (current.includes(message.id) ? current : [...current, message.id]));
       setSaveTargetMessageId(null);
+      await router.push({
+        pathname: '/checkout',
+        query: {
+          savedDesignId: savedDesign.id,
+          prefillName: customerName || undefined,
+          prefillPhone: customerPhone || undefined,
+        },
+      });
     } catch {
       setSaveState('error');
       setSaveError(copy.saveDesignError);

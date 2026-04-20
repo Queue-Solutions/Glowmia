@@ -1,13 +1,15 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { CheckCircle2, Loader2, ShoppingCart, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
 import { localizeText, type Design } from '@/src/data/designs';
+import { fetchSavedDesign, resolveViewerIdentity, type SavedDesignEntry } from '@/src/services/engagement';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { useCartContext } from '@/src/context/CartContext';
@@ -21,8 +23,35 @@ type CheckoutPageProps = {
 type CheckoutResponse = {
   ok?: boolean;
   orderId?: string;
+  emailStatus?: 'sent' | 'skipped' | 'failed';
+  emailError?: string | null;
   error?: string;
 };
+
+type DisplayCheckoutItem =
+  | {
+      key: string;
+      kind: 'cart';
+      design: Design;
+      imageUrl: string;
+      href: string;
+      designName: string;
+      description: string;
+      size: string | null;
+      quantity: number;
+    }
+  | {
+      key: string;
+      kind: 'saved';
+      design: Design | null;
+      savedDesign: SavedDesignEntry;
+      imageUrl: string;
+      href: string | null;
+      designName: string;
+      description: string;
+      size: string | null;
+      quantity: number;
+    };
 
 export const getStaticProps: GetStaticProps<CheckoutPageProps> = async () => {
   const designs = await getAllDesignsFromSupabase();
@@ -36,23 +65,25 @@ export const getStaticProps: GetStaticProps<CheckoutPageProps> = async () => {
 };
 
 export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof getStaticProps>) {
+  const router = useRouter();
   const { language } = useSitePreferencesContext();
   const { entries, hydrated, clearCart } = useCartContext();
   const [formState, setFormState] = useState({
     name: '',
     phoneCode: '+20',
     phone: '',
-    email: '',
-    country: '',
+    address: '',
+    city: '',
+    notes: '',
   });
+  const [savedDesign, setSavedDesign] = useState<SavedDesignEntry | null>(null);
+  const [savedDesignState, setSavedDesignState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [savedDesignError, setSavedDesignError] = useState('');
   const [submitState, setSubmitState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
   const [orderId, setOrderId] = useState('');
 
-  const designsById = useMemo(
-    () => new Map(designs.map((design) => [design.id, design])),
-    [designs],
-  );
+  const designsById = useMemo(() => new Map(designs.map((design) => [design.id, design])), [designs]);
 
   const checkoutItems = useMemo(
     () =>
@@ -65,11 +96,110 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     [designsById, entries],
   );
 
-  const totalQuantity = useMemo(
-    () => checkoutItems.reduce((sum, item) => sum + item.entry.quantity, 0),
-    [checkoutItems],
-  );
-  const hasItems = hydrated && checkoutItems.length > 0;
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const prefillName = typeof router.query.prefillName === 'string' ? router.query.prefillName.trim() : '';
+    const prefillPhone = typeof router.query.prefillPhone === 'string' ? router.query.prefillPhone.trim() : '';
+
+    if (!prefillName && !prefillPhone) {
+      return;
+    }
+
+    setFormState((current) => ({
+      ...current,
+      name: current.name || prefillName,
+      phone: current.phone || prefillPhone,
+    }));
+  }, [router.isReady, router.query.prefillName, router.query.prefillPhone]);
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const savedDesignId = typeof router.query.savedDesignId === 'string' ? router.query.savedDesignId.trim() : '';
+
+    if (!savedDesignId) {
+      setSavedDesign(null);
+      setSavedDesignState('idle');
+      setSavedDesignError('');
+      return;
+    }
+
+    let cancelled = false;
+    setSavedDesignState('loading');
+    setSavedDesignError('');
+
+    void fetchSavedDesign(savedDesignId)
+      .then((nextSavedDesign) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!nextSavedDesign) {
+          setSavedDesign(null);
+          setSavedDesignState('error');
+          setSavedDesignError(language === 'ar' ? 'تعذر العثور على التصميم المحفوظ.' : 'The saved design could not be found.');
+          return;
+        }
+
+        setSavedDesign(nextSavedDesign);
+        setSavedDesignState('loaded');
+      })
+      .catch((loadError) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSavedDesign(null);
+        setSavedDesignState('error');
+        setSavedDesignError(loadError instanceof Error ? loadError.message : language === 'ar' ? 'تعذر تحميل التصميم المحفوظ.' : 'Unable to load the saved design.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [language, router.isReady, router.query.savedDesignId]);
+
+  const displayItems = useMemo(() => {
+    const cartDisplayItems: DisplayCheckoutItem[] = checkoutItems.map(({ entry, design }) => ({
+      key: `${entry.designId}-${entry.size}`,
+      kind: 'cart',
+      design,
+      imageUrl: design.coverImage,
+      href: `/designs/${design.slug}`,
+      designName: localizeText(language, design.name),
+      description: localizeText(language, design.description),
+      size: entry.size,
+      quantity: entry.quantity,
+    }));
+
+    if (!savedDesign) {
+      return cartDisplayItems;
+    }
+
+    const originalDress = designsById.get(savedDesign.dressId) ?? null;
+    const savedDesignDisplayItem: DisplayCheckoutItem = {
+      key: `saved-design-${savedDesign.id}`,
+      kind: 'saved',
+      design: originalDress,
+      savedDesign,
+      imageUrl: savedDesign.editedImageUrl || savedDesign.originalImageUrl,
+      href: originalDress ? `/designs/${originalDress.slug}` : null,
+      designName: savedDesign.designName || (originalDress ? localizeText(language, originalDress.name) : language === 'ar' ? 'تصميم محفوظ' : 'Saved design'),
+      description: savedDesign.prompt || (originalDress ? localizeText(language, originalDress.description) : ''),
+      size: null,
+      quantity: 1,
+    };
+
+    return [savedDesignDisplayItem, ...cartDisplayItems];
+  }, [checkoutItems, designsById, language, savedDesign]);
+
+  const totalQuantity = useMemo(() => displayItems.reduce((sum, item) => sum + item.quantity, 0), [displayItems]);
+  const hasItems = hydrated && (displayItems.length > 0 || savedDesignState === 'loading');
 
   const updateField = (field: keyof typeof formState, value: string) => {
     setFormState((current) => ({ ...current, [field]: value }));
@@ -80,11 +210,12 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const hasAllFields = Object.values(formState).every((value) => value.trim());
+    const requiredFields = [formState.name, formState.phone, formState.address, formState.city];
+    const hasAllFields = requiredFields.every((value) => value.trim());
     const normalizedLocalPhone = formState.phone.replace(/[\s()-]/g, '').replace(/^0+/, '');
     const fullPhone = `${formState.phoneCode}${normalizedLocalPhone}`;
 
-    if (!hasAllFields || checkoutItems.length === 0) {
+    if (!hasAllFields || displayItems.length === 0) {
       setSubmitState('error');
       setError(copyFor(language, glowmiaCopy.checkout.requiredError));
       return;
@@ -94,6 +225,7 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     setError('');
 
     try {
+      const identity = await resolveViewerIdentity();
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -101,20 +233,30 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
         },
         body: JSON.stringify({
           customer: {
-            ...formState,
+            name: formState.name,
             phone: fullPhone,
+            address: formState.address,
+            city: formState.city,
           },
+          notes: formState.notes,
+          userId: identity.userId,
+          guestId: identity.guestId,
           items: checkoutItems.map(({ entry }) => ({
             designId: entry.designId,
             size: entry.size,
             quantity: entry.quantity,
           })),
+          savedDesignId: savedDesign?.id || null,
         }),
       });
       const data = (await response.json()) as CheckoutResponse;
 
       if (!response.ok || !data.ok) {
         throw new Error(data.error || copyFor(language, glowmiaCopy.checkout.requiredError));
+      }
+
+      if (data.emailStatus === 'failed') {
+        console.warn('Glowmia order email failed:', data.emailError || 'Unable to send order email.');
       }
 
       setOrderId(data.orderId || '');
@@ -154,6 +296,8 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
             </Link>
           </div>
 
+          {savedDesignState === 'error' && savedDesignError ? <p className="checkout-error">{savedDesignError}</p> : null}
+
           {hasItems ? (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start">
               <section className="grid gap-4">
@@ -164,44 +308,77 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
                   </span>
                 </div>
 
-                {checkoutItems.map(({ entry, design }) => (
-                  <article key={`${entry.designId}-${entry.size}`} className="cart-line-item">
-                    <Link href={`/designs/${design.slug}`} className="cart-line-item__media">
-                      <Image
-                        src={design.coverImage}
-                        alt={localizeText(language, design.name)}
-                        fill
-                        className="object-cover object-top"
-                        sizes="(max-width: 768px) 38vw, 12rem"
-                      />
-                    </Link>
+                {savedDesignState === 'loading' && displayItems.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-10 text-center text-sm text-[color:var(--text-muted)]">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {language === 'ar' ? 'جارٍ تحميل التصميم المحفوظ...' : 'Loading saved design...'}
+                    </span>
+                  </div>
+                ) : null}
 
-                    <div className="cart-line-item__body">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="eyebrow-chip !px-3 !py-2 !text-[0.65rem]">
-                            {localizeText(language, design.categoryLabel)}
-                          </span>
-                          <span className="cart-size-pill">
-                            {copyFor(language, glowmiaCopy.cart.sizeLabel)} {entry.size}
-                          </span>
-                          <span className="cart-size-pill">
-                            {copyFor(language, glowmiaCopy.cart.quantity)} {entry.quantity}
-                          </span>
-                        </div>
+                {displayItems.map((item) => {
+                  const media = (
+                    <>
+                      {item.kind === 'saved' ? (
+                        <img src={item.imageUrl} alt={item.designName} className="h-full w-full object-cover object-top" />
+                      ) : (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.designName}
+                          fill
+                          className="object-cover object-top"
+                          sizes="(max-width: 768px) 38vw, 12rem"
+                        />
+                      )}
+                    </>
+                  );
 
-                        <div>
-                          <Link href={`/designs/${design.slug}`} className="text-2xl font-semibold tracking-[-0.02em] text-[color:var(--text-primary)] transition hover:text-[color:var(--accent)]">
-                            {localizeText(language, design.name)}
-                          </Link>
-                          <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">
-                            {localizeText(language, design.description)}
-                          </p>
+                  return (
+                    <article key={item.key} className="cart-line-item">
+                      {item.href ? (
+                        <Link href={item.href} className="cart-line-item__media">
+                          {media}
+                        </Link>
+                      ) : (
+                        <div className="cart-line-item__media">{media}</div>
+                      )}
+
+                      <div className="cart-line-item__body">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {item.design ? (
+                              <span className="eyebrow-chip !px-3 !py-2 !text-[0.65rem]">
+                                {localizeText(language, item.design.categoryLabel)}
+                              </span>
+                            ) : null}
+                            {item.size ? (
+                              <span className="cart-size-pill">
+                                {copyFor(language, glowmiaCopy.cart.sizeLabel)} {item.size}
+                              </span>
+                            ) : null}
+                            <span className="cart-size-pill">
+                              {copyFor(language, glowmiaCopy.cart.quantity)} {item.quantity}
+                            </span>
+                          </div>
+
+                          <div>
+                            {item.href ? (
+                              <Link href={item.href} className="text-2xl font-semibold tracking-[-0.02em] text-[color:var(--text-primary)] transition hover:text-[color:var(--accent)]">
+                                {item.designName}
+                              </Link>
+                            ) : (
+                              <p className="text-2xl font-semibold tracking-[-0.02em] text-[color:var(--text-primary)]">{item.designName}</p>
+                            )}
+                            {item.description ? (
+                              <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">{item.description}</p>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </section>
 
               <form onSubmit={handleSubmit} className="checkout-form-panel">
@@ -250,29 +427,39 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
                 </label>
 
                 <label className="checkout-field">
-                  <span>{copyFor(language, glowmiaCopy.checkout.email)}</span>
+                  <span>{copyFor(language, glowmiaCopy.checkout.address)}</span>
                   <input
-                    value={formState.email}
-                    onChange={(event) => updateField('email', event.target.value)}
-                    placeholder={copyFor(language, glowmiaCopy.checkout.emailPlaceholder)}
+                    value={formState.address}
+                    onChange={(event) => updateField('address', event.target.value)}
+                    placeholder={copyFor(language, glowmiaCopy.checkout.addressPlaceholder)}
                     className="field-input"
-                    inputMode="email"
                   />
                 </label>
 
                 <label className="checkout-field">
-                  <span>{copyFor(language, glowmiaCopy.checkout.country)}</span>
+                  <span>{copyFor(language, glowmiaCopy.checkout.city)}</span>
                   <input
-                    value={formState.country}
-                    onChange={(event) => updateField('country', event.target.value)}
-                    placeholder={copyFor(language, glowmiaCopy.checkout.countryPlaceholder)}
+                    value={formState.city}
+                    onChange={(event) => updateField('city', event.target.value)}
+                    placeholder={copyFor(language, glowmiaCopy.checkout.cityPlaceholder)}
                     className="field-input"
+                  />
+                </label>
+
+                <label className="checkout-field">
+                  <span>{copyFor(language, glowmiaCopy.checkout.notes)}</span>
+                  <textarea
+                    value={formState.notes}
+                    onChange={(event) => updateField('notes', event.target.value)}
+                    placeholder={copyFor(language, glowmiaCopy.checkout.notesPlaceholder)}
+                    className="field-input min-h-[7rem] resize-y"
+                    rows={4}
                   />
                 </label>
 
                 {submitState === 'error' && error ? <p className="checkout-error">{error}</p> : null}
 
-                <button type="submit" className="primary-button w-full" disabled={submitState === 'sending'}>
+                <button type="submit" className="primary-button w-full" disabled={submitState === 'sending' || savedDesignState === 'loading'}>
                   {submitState === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {submitState === 'sending' ? copyFor(language, glowmiaCopy.checkout.submitting) : copyFor(language, glowmiaCopy.checkout.submit)}
                 </button>
