@@ -29,9 +29,22 @@ export default async function handler(request: NextApiRequest, response: NextApi
   }
 
   const username = typeof request.body?.username === 'string' ? request.body.username.trim() : '';
-  const password = typeof request.body?.password === 'string' ? request.body.password : '';
+  const password = typeof request.body?.password === 'string' ? request.body.password.trim() : '';
+
+  // Detect if password looks like a hash
+  const looksLikeHash = 
+    password.startsWith('scrypt') ||
+    (password.length > 40 && /^[a-f0-9]+$/i.test(password));
 
   console.log('[Admin Session] Login attempt for username:', username);
+  if (looksLikeHash) {
+    console.warn('[Admin Session] Password appears to be a hash for username:', username);
+    await wait(450);
+    response.status(401).json({ 
+      error: 'Invalid username or password. Tip: Please enter your password, not a system-generated key.' 
+    });
+    return;
+  }
 
   if (!verifyAdminCredentials(username, password)) {
     console.error('[Admin Session] Invalid credentials for username:', username);

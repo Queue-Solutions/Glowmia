@@ -147,6 +147,19 @@ export function createAdminPasswordHash(password: string) {
 }
 
 export function verifyAdminPassword(password: string, storedHash: string) {
+  // Trim incoming password to remove any whitespace
+  const trimmedPassword = password.trim();
+  
+  // Detect if user entered a hash-like string instead of a password
+  const looksLikeHash = 
+    trimmedPassword.startsWith('scrypt') ||
+    (trimmedPassword.length > 40 && /^[a-f0-9]+$/i.test(trimmedPassword));
+  
+  if (looksLikeHash) {
+    console.warn('[Admin Auth] Password appears to be a hash; user may have entered system credentials');
+    return false;
+  }
+
   const [algorithm, salt, expectedHash] = storedHash.split('$');
 
   if (algorithm !== 'scrypt' || !salt || !expectedHash) {
@@ -154,17 +167,22 @@ export function verifyAdminPassword(password: string, storedHash: string) {
     return false;
   }
 
-  const expectedBuffer = Buffer.from(expectedHash, 'hex');
-  const derivedBuffer = scryptSync(password, salt, expectedBuffer.length);
+  try {
+    const expectedBuffer = Buffer.from(expectedHash, 'hex');
+    const derivedBuffer = scryptSync(trimmedPassword, salt, expectedBuffer.length);
 
-  if (expectedBuffer.length !== derivedBuffer.length) {
-    console.error('[Admin Auth] Buffer length mismatch');
+    if (expectedBuffer.length !== derivedBuffer.length) {
+      console.error('[Admin Auth] Buffer length mismatch');
+      return false;
+    }
+
+    const isMatch = timingSafeEqual(expectedBuffer, derivedBuffer);
+    console.log('[Admin Auth] Password verification:', isMatch ? 'PASS' : 'FAIL');
+    return isMatch;
+  } catch (error) {
+    console.error('[Admin Auth] Password verification error:', error instanceof Error ? error.message : 'Unknown error');
     return false;
   }
-
-  const isMatch = timingSafeEqual(expectedBuffer, derivedBuffer);
-  console.log('[Admin Auth] Password verification:', isMatch ? 'PASS' : 'FAIL');
-  return isMatch;
 }
 
 export function verifyAdminCredentials(username: string, password: string) {
