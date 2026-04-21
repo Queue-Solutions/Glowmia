@@ -2,7 +2,8 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
 import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
@@ -29,6 +30,13 @@ export const getStaticProps: GetStaticProps<CartPageProps> = async () => {
 export default function CartPage({ designs }: InferGetStaticPropsType<typeof getStaticProps>) {
   const { language } = useSitePreferencesContext();
   const { entries, totalQuantity, updateQuantity, removeItem, clearCart } = useCartContext();
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const clearCartDialogMessage =
+    language === 'ar'
+      ? '\u0647\u0644 \u0623\u0646\u062a \u0645\u062a\u0623\u0643\u062f \u0623\u0646\u0643 \u062a\u0631\u064a\u062f \u0625\u0641\u0631\u0627\u063a \u0627\u0644\u0633\u0644\u0629\u061f'
+      : 'Are you sure you want to clear the cart?';
+  const clearCartYesLabel = language === 'ar' ? '\u0646\u0639\u0645' : 'Yes';
+  const clearCartNoLabel = language === 'ar' ? '\u0644\u0627' : 'No';
 
   const designsById = useMemo(
     () => new Map(designs.map((design) => [design.id, design])),
@@ -47,6 +55,19 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
   );
 
   const hasItems = cartItems.length > 0;
+
+  const handleClearCart = () => {
+    setShowClearCartConfirm(true);
+  };
+
+  const confirmClearCart = () => {
+    clearCart();
+    setShowClearCartConfirm(false);
+  };
+
+  const dismissClearCartConfirm = () => {
+    setShowClearCartConfirm(false);
+  };
 
   return (
     <>
@@ -87,13 +108,15 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                   return (
                     <article key={`${entry.designId}-${entry.size}`} className="cart-line-item">
                       <Link href={`/designs/${design.slug}`} className="cart-line-item__media">
-                        <Image
-                          src={design.coverImage}
-                          alt={localizeText(language, design.name)}
-                          fill
-                          className="object-cover object-top"
-                          sizes="(max-width: 768px) 38vw, 12rem"
-                        />
+                        <div className="cart-line-item__media-stage">
+                          <Image
+                            src={design.coverImage}
+                            alt={localizeText(language, design.name)}
+                            fill
+                            className="cart-line-item__media-image"
+                            sizes="(max-width: 768px) 38vw, 12rem"
+                          />
+                        </div>
                       </Link>
 
                       <div className="cart-line-item__body">
@@ -165,7 +188,7 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                   <Link href="/checkout" className="primary-button w-full">
                     {copyFor(language, glowmiaCopy.cart.checkout)}
                   </Link>
-                  <button type="button" onClick={clearCart} className="secondary-button w-full">
+                  <button type="button" onClick={handleClearCart} className="secondary-button w-full">
                     {copyFor(language, glowmiaCopy.cart.clearCart)}
                   </button>
                 </div>
@@ -191,6 +214,44 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
           )}
         </section>
       </SiteLayout>
+      <AnimatePresence>
+        {showClearCartConfirm ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="checkout-modal">
+            <button
+              type="button"
+              className="checkout-modal__backdrop"
+              onClick={dismissClearCartConfirm}
+              aria-label={clearCartNoLabel}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="checkout-modal__panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="clear-cart-confirm-title"
+            >
+              <div className="space-y-3 text-center">
+                <h2 id="clear-cart-confirm-title" className="text-2xl font-semibold tracking-[-0.02em] text-[color:var(--text-primary)]">
+                  {copyFor(language, glowmiaCopy.cart.clearCart)}
+                </h2>
+                <p className="text-sm leading-7 text-[color:var(--text-muted)]">{clearCartDialogMessage}</p>
+              </div>
+
+              <div className="grid w-full gap-3 sm:grid-cols-2">
+                <button type="button" onClick={confirmClearCart} className="primary-button w-full">
+                  {clearCartYesLabel}
+                </button>
+                <button type="button" onClick={dismissClearCartConfirm} className="secondary-button w-full">
+                  {clearCartNoLabel}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </>
   );
 }

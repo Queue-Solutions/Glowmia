@@ -422,19 +422,19 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
 
                 {displayItems.map((item) => {
                   const media = (
-                    <>
+                    <div className="cart-line-item__media-stage">
                       {item.kind === 'saved' ? (
-                        <img src={item.imageUrl} alt={item.designName} className="h-full w-full object-cover object-top" />
+                        <img src={item.imageUrl} alt={item.designName} className="cart-line-item__media-image" />
                       ) : (
                         <Image
                           src={item.imageUrl}
                           alt={item.designName}
                           fill
-                          className="object-cover object-top"
+                          className="cart-line-item__media-image"
                           sizes="(max-width: 768px) 38vw, 12rem"
                         />
                       )}
-                    </>
+                    </div>
                   );
 
                   return (

@@ -1596,30 +1596,30 @@ export default function AtelierVaultPage({
                       </Field>
 
                       <div className="grid gap-4 md:col-span-2 md:grid-cols-3">
-                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface)]">
+                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white">
                           {formState.coverImageUrl ? (
-                            <img src={formState.coverImageUrl} alt="Cover/front preview" className="aspect-[4/5] w-full object-contain object-top bg-[color:var(--surface-base)]" />
+                            <img src={formState.coverImageUrl} alt="Cover/front preview" className="aspect-[4/5] w-full object-contain object-center bg-white p-3" />
                           ) : (
                             <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.coverPreview}</div>
                           )}
                         </div>
-                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface)]">
+                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white">
                           {formState.sideImageUrl ? (
                             <img
                               src={formState.sideImageUrl}
                               alt="Side view preview"
-                              className="aspect-[4/5] w-full object-contain object-top bg-[color:var(--surface-base)]"
+                              className="aspect-[4/5] w-full object-contain object-center bg-white p-3"
                             />
                           ) : (
                             <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.sidePreview}</div>
                           )}
                         </div>
-                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface)]">
+                        <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-white">
                           {formState.backImageUrl ? (
                             <img
                               src={formState.backImageUrl}
                               alt="Back view preview"
-                              className="aspect-[4/5] w-full object-contain object-top bg-[color:var(--surface-base)]"
+                              className="aspect-[4/5] w-full object-contain object-center bg-white p-3"
                             />
                           ) : (
                             <div className="grid aspect-[4/5] w-full place-items-center px-6 text-center text-sm text-[color:var(--text-muted)]">{ui.backPreview}</div>

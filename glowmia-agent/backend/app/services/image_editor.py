@@ -1,27 +1,151 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
+import json
+import logging
 import replicate
 from app.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+_DIRECT_URL_KEYS = (
+    "edited_image_url",
+    "editedImageUrl",
+    "url",
+    "image_url",
+    "imageUrl",
+    "output_url",
+    "outputUrl",
+)
+_NESTED_OUTPUT_KEYS = (
+    "output",
+    "outputs",
+    "data",
+    "result",
+    "results",
+    "prediction",
+    "predictions",
+)
+
+
+def _coerce_http_url(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized.startswith("http://") or normalized.startswith("https://"):
+            return normalized
+        return None
+
+    try:
+        normalized = str(value).strip()
+        if normalized.startswith("http://") or normalized.startswith("https://"):
+            return normalized
+    except Exception:
+        return None
+
+    return None
+
+
+def _iter_collection(value: Any) -> Iterable[Any]:
+    if isinstance(value, (list, tuple, set)):
+        return value
+
+    return ()
+
+
+def _safe_output_preview(output: Any) -> str:
+    try:
+        if hasattr(output, "model_dump") and callable(output.model_dump):
+            preview = output.model_dump()
+        elif hasattr(output, "dict") and callable(output.dict):
+            preview = output.dict()
+        else:
+            preview = output
+
+        serialized = json.dumps(preview, default=str, ensure_ascii=True)
+    except Exception:
+        serialized = repr(output)
+
+    if len(serialized) > 1500:
+        return f"{serialized[:1500]}..."
+
+    return serialized
 
 
 def _to_output_url(output: Any) -> Optional[str]:
     if output is None:
         return None
 
-    if isinstance(output, list) and output:
-        return _to_output_url(output[0])
+    direct_url = _coerce_http_url(output)
+    if direct_url:
+        return direct_url
+
+    for item in _iter_collection(output):
+        normalized = _to_output_url(item)
+        if normalized:
+            return normalized
+
+    if isinstance(output, dict):
+        for key in _DIRECT_URL_KEYS:
+            if key in output:
+                normalized = _to_output_url(output.get(key))
+                if normalized:
+                    return normalized
+
+        for key in _NESTED_OUTPUT_KEYS:
+            if key in output:
+                normalized = _to_output_url(output.get(key))
+                if normalized:
+                    return normalized
+
+        return None
 
     url = getattr(output, "url", None)
-    if isinstance(url, str) and url:
-        return url
+    if callable(url):
+        try:
+            url = url()
+        except Exception:
+            url = None
+    normalized_url = _to_output_url(url)
+    if normalized_url:
+        return normalized_url
+
+    for method_name in ("model_dump", "dict", "to_dict"):
+        method = getattr(output, method_name, None)
+        if callable(method):
+            try:
+                normalized = _to_output_url(method())
+                if normalized:
+                    return normalized
+            except Exception:
+                continue
+
+    for key in _DIRECT_URL_KEYS:
+        try:
+            normalized = _to_output_url(getattr(output, key, None))
+            if normalized:
+                return normalized
+        except Exception:
+            continue
+
+    for key in _NESTED_OUTPUT_KEYS:
+        try:
+            normalized = _to_output_url(getattr(output, key, None))
+            if normalized:
+                return normalized
+        except Exception:
+            continue
 
     try:
-        value = str(output)
-        if value.startswith("http://") or value.startswith("https://"):
-            return value
+        iterator = iter(output)
     except Exception:
-        pass
+        iterator = ()
+
+    for item in iterator:
+        normalized = _to_output_url(item)
+        if normalized:
+            return normalized
 
     return None
 
@@ -143,13 +267,29 @@ def apply_edits(image_url: str, parsed_edits: Dict[str, Any], user_instruction: 
         },
     )
 
+    logger.info(
+        "Replicate edit response received | model=%s | output_type=%s | output=%s",
+        settings.replicate_model,
+        type(output).__name__,
+        _safe_output_preview(output),
+    )
+
     edited_image_url = _to_output_url(output)
 
     if not edited_image_url:
-        raise ValueError("Replicate returned no editable image URL")
+        logger.error(
+            "Replicate returned no editable image URL | model=%s | output_type=%s | output=%s",
+            settings.replicate_model,
+            type(output).__name__,
+            _safe_output_preview(output),
+        )
+        raise ValueError(
+            f"Replicate returned no editable image URL. output_type={type(output).__name__}"
+        )
 
     return {
         "edited_image_url": edited_image_url,
+        "editedImageUrl": edited_image_url,
         "provider": "replicate",
         "model": settings.replicate_model,
         "prompt_used": prompt,

@@ -87,6 +87,68 @@ function parseJsonResponseBody(text: string): JsonResponse {
   }
 }
 
+function extractImageUrl(value: unknown): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return /^https?:\/\//i.test(normalized) ? normalized : null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = extractImageUrl(item);
+      if (nested) {
+        return nested;
+      }
+    }
+
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+
+    for (const key of ['edited_image_url', 'editedImageUrl', 'url', 'image_url', 'imageUrl', 'output_url', 'outputUrl']) {
+      const direct = extractImageUrl(record[key]);
+      if (direct) {
+        return direct;
+      }
+    }
+
+    for (const key of ['output', 'outputs', 'data', 'result', 'results', 'prediction', 'predictions']) {
+      const nested = extractImageUrl(record[key]);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizeEditResponse(data: JsonResponse): JsonResponse & {
+  edited_image_url: string | null;
+  editedImageUrl: string | null;
+  error?: unknown;
+  message?: unknown;
+} {
+  const editedImageUrl =
+    extractImageUrl(data.edited_image_url) ||
+    extractImageUrl(data.editedImageUrl) ||
+    extractImageUrl(data.output) ||
+    extractImageUrl(data.data) ||
+    null;
+
+  return {
+    ...data,
+    edited_image_url: editedImageUrl,
+    editedImageUrl,
+  };
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -212,7 +274,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         timeoutMs,
       );
 
-      return sendJson(res, status, data);
+      const normalizedData = normalizeEditResponse(data);
+
+      if (status >= 200 && status < 300) {
+        console.info('[agent proxy] edit response received', {
+          status,
+          sessionId,
+          dressId,
+          hasEditedImageUrl: Boolean(normalizedData.edited_image_url),
+          upstreamKeys: Object.keys(data),
+        });
+
+        if (!normalizedData.edited_image_url) {
+          const detail =
+            (typeof normalizedData.error === 'string' && normalizedData.error) ||
+            (typeof normalizedData.message === 'string' && normalizedData.message) ||
+            'The edit request completed but no edited image URL was returned.';
+
+          console.error('[agent proxy] edit response missing usable image URL', {
+            status,
+            sessionId,
+            dressId,
+            backendUrl: backendConfig.baseUrl,
+            upstreamKeys: Object.keys(data),
+            normalizedKeys: Object.keys(normalizedData),
+          });
+
+          return sendJson(res, 502, {
+            detail,
+            code: 'AGENT_EDIT_NO_IMAGE',
+          });
+        }
+      }
+
+      return sendJson(res, status, normalizedData);
     }
 
     return sendJson(res, 404, {
