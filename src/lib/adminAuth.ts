@@ -160,7 +160,9 @@ export function verifyAdminPassword(password: string, storedHash: string) {
     return false;
   }
 
-  const [algorithm, salt, expectedHash] = storedHash.split('$');
+  // Split by $ and filter out empty strings (first element is empty when hash starts with scrypt$)
+  const parts = storedHash.split('$').filter(Boolean);
+  const [algorithm, salt, expectedHash] = parts;
 
   if (algorithm !== 'scrypt' || !salt || !expectedHash) {
     console.error('[Admin Auth] Invalid hash format - algorithm:', algorithm, 'salt:', !!salt, 'hash:', !!expectedHash);
