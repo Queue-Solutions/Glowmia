@@ -13,7 +13,7 @@ export default function AgentPage() {
         />
       </Head>
 
-      <SiteLayout currentPath="/agent">
+      <SiteLayout currentPath="/agent" immersive showFooter={false}>
         <AgentExperience />
       </SiteLayout>
     </>

@@ -20,10 +20,9 @@ import {
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import {
   createAgentSession,
-  requestAgentEdit,
-  requestAgentRecommendations,
   type AgentDress,
-  type AgentEditResponse,
+  type AgentChatResponse,
+  sendAgentMessage,
 } from '@/src/services/glowmiaAgent';
 import { resolveViewerIdentity, submitAgentFeedback, submitSavedDesignOrder } from '@/src/services/engagement';
 
@@ -47,7 +46,18 @@ type AgentEditMessage = {
   id: string;
   role: 'assistant';
   type: 'edit';
-  data: AgentEditResponse & { dressName: string; prompt?: string };
+  data: {
+    session_id: string;
+    dress_id: string;
+    original_image_url: string;
+    edited_image_url?: string | null;
+    parsed_edits: Record<string, unknown>;
+    provider: string;
+    model?: string | null;
+    message: string;
+    dressName: string;
+    prompt?: string;
+  };
 };
 
 type AgentMessage = AgentTextMessage | AgentRecommendationMessage | AgentEditMessage;
@@ -301,11 +311,50 @@ function formatParsedEditValue(value: unknown) {
 }
 
 function getRecommendationImageUrl(dress: AgentDress) {
-  return dress.front_view_url || dress.image_url;
+  return dress.front_view_url || dress.cover_image_url || dress.image_url;
 }
 
 function getEditingImageUrl(dress: AgentDress) {
-  return dress.detail_image_url || dress.image_url;
+  return dress.front_view_url || dress.detail_image_url || dress.image_url || dress.cover_image_url || '';
+}
+
+function buildSelectedDressFromResponse(
+  response: AgentChatResponse,
+  currentSelectedDress: AgentDress | null,
+  language: 'en' | 'ar',
+) {
+  const matchingDress =
+    response.dresses?.find((dress) => dress.id === response.selected_dress_id) ||
+    response.dresses?.find((dress) => dress.id === currentSelectedDress?.id) ||
+    null;
+
+  const baseDress = matchingDress || currentSelectedDress;
+
+  if (!baseDress && !response.selected_dress_id) {
+    return currentSelectedDress;
+  }
+
+  if (!baseDress && response.selected_dress_id) {
+    return {
+      id: response.selected_dress_id,
+      name: language === 'ar' ? 'فستان Glowmia' : 'Glowmia Dress',
+      image_url: response.edited_image_url || null,
+      front_view_url: response.edited_image_url || null,
+    } satisfies AgentDress;
+  }
+
+  if (!baseDress) {
+    return null;
+  }
+
+  const activeImageUrl = response.edited_image_url || getEditingImageUrl(baseDress) || baseDress.image_url || null;
+
+  return {
+    ...baseDress,
+    id: response.selected_dress_id || baseDress.id,
+    image_url: activeImageUrl,
+    front_view_url: activeImageUrl,
+  } satisfies AgentDress;
 }
 
 export function AgentExperience() {
@@ -456,8 +505,8 @@ export function AgentExperience() {
     clearFeedbackTimer();
 
     try {
-      const session = await createAgentSession(copy.sessionTitle);
-      setSessionId(session.id);
+      const session = await createAgentSession(language);
+      setSessionId(session.session_id);
       setMessages([
         {
           id: createMessageId(),
@@ -539,12 +588,21 @@ export function AgentExperience() {
     setSaveError('');
 
     try {
-      if (mode === 'edit' && selectedDress) {
-        const response = await requestAgentEdit(sessionId, {
-          dressId: selectedDress.id,
-          imageUrl: getEditingImageUrl(selectedDress),
-          instruction: trimmed,
-        });
+      const response = await sendAgentMessage({
+        sessionId,
+        message: trimmed,
+        language,
+        selectedDressId: selectedDress?.id ?? null,
+        selectedDressImageUrl: selectedDress ? getEditingImageUrl(selectedDress) : null,
+        modeHint: mode === 'edit' && selectedDress ? 'edit' : null,
+      });
+
+      if (response.tool === 'edit' && selectedDress) {
+        const nextSelectedDress = buildSelectedDressFromResponse(response, selectedDress, language);
+
+        if (nextSelectedDress) {
+          setSelectedDress(nextSelectedDress);
+        }
 
         if (!response.edited_image_url) {
           appendMessage({
@@ -562,8 +620,15 @@ export function AgentExperience() {
             role: 'assistant',
             type: 'edit',
             data: {
-              ...response,
-              dressName: selectedDress.name_ar?.trim() || localizeDressName(selectedDress, language),
+              session_id: response.session_id,
+              dress_id: nextSelectedDress?.id || selectedDress.id,
+              original_image_url: getEditingImageUrl(selectedDress),
+              edited_image_url: response.edited_image_url,
+              parsed_edits: {},
+              provider: 'replicate',
+              model: null,
+              message: response.message,
+              dressName: nextSelectedDress?.name_ar?.trim() || localizeDressName(nextSelectedDress || selectedDress, language),
               prompt: trimmed,
             },
           });
@@ -576,23 +641,44 @@ export function AgentExperience() {
         return;
       }
 
-      const response = await requestAgentRecommendations(sessionId, trimmed);
-      const results = response.results ?? [];
+      if (response.message && response.tool !== 'recommend') {
+        appendMessage({
+          id: createMessageId(),
+          role: 'assistant',
+          type: 'text',
+          text: response.message,
+        });
+      }
 
-      if (results.length === 0) {
+      if (response.dresses?.length) {
+        if (response.message && response.tool === 'recommend') {
+          appendMessage({
+            id: createMessageId(),
+            role: 'assistant',
+            type: 'text',
+            text: response.message,
+          });
+        }
+
+        appendMessage({
+          id: createMessageId(),
+          role: 'assistant',
+          type: 'recommend',
+          data: response.dresses,
+        });
+      } else if (response.tool === 'recommend') {
         appendMessage({
           id: createMessageId(),
           role: 'assistant',
           type: 'text',
           text: copy.noResults,
         });
-      } else {
-        appendMessage({
-          id: createMessageId(),
-          role: 'assistant',
-          type: 'recommend',
-          data: results,
-        });
+      }
+
+      const nextSelectedDress = buildSelectedDressFromResponse(response, selectedDress, language);
+      if (nextSelectedDress && response.selected_dress_id) {
+        setSelectedDress(nextSelectedDress);
+        setMode('edit');
       }
     } catch (requestError) {
       const detail = requestError instanceof Error ? requestError.message : copy.connectionError;
@@ -669,36 +755,24 @@ export function AgentExperience() {
       setHiddenSavePanelMessageIds((current) => (current.includes(message.id) ? current : [...current, message.id]));
       setSaveTargetMessageId(null);
       await router.push({
-        pathname: '/checkout',
+        pathname: '/cart',
         query: {
           savedDesignId: savedDesign.id,
           prefillName: customerName || undefined,
           prefillPhone: customerPhone || undefined,
         },
       });
-    } catch {
+    } catch (saveError) {
       setSaveState('error');
-      setSaveError(copy.saveDesignError);
+      setSaveError(saveError instanceof Error ? saveError.message : copy.saveDesignError);
     }
   }
 
   const showEmptyIntro = messages.length <= 1 && !loading;
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-5 pb-10 md:px-10">
+    <section className="agent-page-shell flex w-full flex-1">
       <div className="agent-shell">
-        <motion.header
-          className="agent-shell__hero text-center"
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <span className="eyebrow-chip">
-            <Sparkles className="h-4 w-4" />
-            {copy.eyebrow}
-          </span>
-        </motion.header>
-
         <motion.div
           className="agent-console"
           initial={{ opacity: 0, y: 18 }}
@@ -982,10 +1056,15 @@ export function AgentExperience() {
                             const description = localizeDressDescription(dress, language);
                             const meta = buildDressMeta(dress, language);
                             const isSelected = selectedDress?.id === dress.id;
+                            const recommendationImageUrl = getRecommendationImageUrl(dress);
 
                             return (
                               <article key={dress.id} className={`agent-card ${isSelected ? 'agent-card--selected' : ''}`}>
-                                <img src={getRecommendationImageUrl(dress)} alt={dressName} className="agent-card__image" />
+                                {recommendationImageUrl ? (
+                                  <img src={recommendationImageUrl} alt={dressName} className="agent-card__image" />
+                                ) : (
+                                  <div className="agent-card__image" aria-hidden="true" />
+                                )}
 
                                 <div className="agent-card__body">
                                   <div className="space-y-3">

@@ -7,19 +7,22 @@ import { CursorAura } from '@/src/components/site/CursorAura';
 type SiteLayoutProps = {
   currentPath: string;
   children: ReactNode;
+  immersive?: boolean;
+  showFooter?: boolean;
 };
 
-export function SiteLayout({ currentPath, children }: SiteLayoutProps) {
+export function SiteLayout({ currentPath, children, immersive = false, showFooter = true }: SiteLayoutProps) {
   const { darkMode, language } = useSitePreferencesContext();
+  const mainClassName = immersive ? 'site-main site-main--immersive' : 'site-main pb-16 pt-6 md:pt-8';
 
   return (
     <div className={`site-theme ${darkMode ? 'theme-dark' : 'theme-light'} ${language === 'ar' ? 'lang-ar' : ''}`}>
       <CursorAura />
       <div className="site-background" />
-      <div className="site-shell min-h-screen">
+      <div className={`site-shell min-h-screen ${immersive ? 'site-shell--immersive' : ''}`}>
         <SiteHeader currentPath={currentPath} />
-        <main className="pb-16 pt-6 md:pt-8">{children}</main>
-        <SiteFooter />
+        <main className={mainClassName}>{children}</main>
+        {showFooter ? <SiteFooter /> : null}
       </div>
     </div>
   );

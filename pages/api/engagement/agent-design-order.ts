@@ -2,6 +2,27 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { randomUUID } from 'crypto';
 import { saveAgentDesign } from '@/src/lib/glowmiaOrders';
 
+function readTrimmedString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isHttpUrl(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
 
@@ -11,27 +32,39 @@ export default async function handler(request: NextApiRequest, response: NextApi
     return;
   }
 
-  const sessionId = typeof request.body?.sessionId === 'string' ? request.body.sessionId.trim() : null;
-  const customerName = typeof request.body?.customerName === 'string' ? request.body.customerName.trim() : '';
-  const customerPhone = typeof request.body?.customerPhone === 'string' ? request.body.customerPhone.trim() : '';
-  const userId = typeof request.body?.userId === 'string' ? request.body.userId.trim() : '';
-  const guestId = typeof request.body?.guestId === 'string' ? request.body.guestId.trim() : '';
-  const dressId = typeof request.body?.dressId === 'string' ? request.body.dressId.trim() : '';
-  const dressName = typeof request.body?.dressName === 'string' ? request.body.dressName.trim() : '';
-  const originalImageUrl = typeof request.body?.originalImageUrl === 'string' ? request.body.originalImageUrl.trim() : '';
-  const editedImageUrl = typeof request.body?.editedImageUrl === 'string' ? request.body.editedImageUrl.trim() : '';
-  const prompt = typeof request.body?.prompt === 'string' ? request.body.prompt.trim() : '';
+  const sessionId = readTrimmedString(request.body?.sessionId) || null;
+  const customerName = readTrimmedString(request.body?.customerName);
+  const customerPhone = readTrimmedString(request.body?.customerPhone);
+  const userId = readTrimmedString(request.body?.userId);
+  const guestId = readTrimmedString(request.body?.guestId);
+  const dressId = readTrimmedString(request.body?.dressId);
+  const dressName = readTrimmedString(request.body?.dressName);
+  const originalImageUrl = readTrimmedString(request.body?.originalImageUrl);
+  const editedImageUrl = readTrimmedString(request.body?.editedImageUrl);
+  const prompt = readTrimmedString(request.body?.prompt);
   const language = request.body?.language === 'ar' ? 'ar' : 'en';
+  const normalizedUserId = isUuid(userId) ? userId : '';
+  const normalizedGuestId = isUuid(guestId) ? guestId : '';
 
   if (!dressId || !dressName || !originalImageUrl || !editedImageUrl) {
     response.status(400).json({ error: 'Missing required saved design details.' });
     return;
   }
 
+  if (!isUuid(dressId)) {
+    response.status(400).json({ error: 'dressId must be a valid UUID.' });
+    return;
+  }
+
+  if (!isHttpUrl(originalImageUrl) || !isHttpUrl(editedImageUrl)) {
+    response.status(400).json({ error: 'originalImageUrl and editedImageUrl must be valid http or https URLs.' });
+    return;
+  }
+
   try {
     const savedDesign = await saveAgentDesign({
-      userId: userId || null,
-      guestId: userId ? null : guestId || randomUUID(),
+      userId: normalizedUserId || null,
+      guestId: normalizedUserId ? null : normalizedGuestId || randomUUID(),
       dressId,
       originalImageUrl,
       editedImageUrl,
@@ -51,24 +84,29 @@ export default async function handler(request: NextApiRequest, response: NextApi
       savedDesign,
     });
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unable to save the edited design. Check the server logs for the insert failure details.';
+
     console.error('[api/engagement/agent-design-order] Failed to save edited design.', {
-      error: error instanceof Error ? error.message : error,
+      error: message,
       dressId,
       dressName,
       hasOriginalImageUrl: Boolean(originalImageUrl),
       hasEditedImageUrl: Boolean(editedImageUrl),
-      hasUserId: Boolean(userId),
-      hasGuestId: Boolean(guestId),
+      hasUserId: Boolean(normalizedUserId),
+      hasGuestId: Boolean(normalizedGuestId),
       hasPrompt: Boolean(prompt),
       sessionId,
       language,
     });
 
-    response.status(500).json({
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Unable to save the edited design. Check the server logs for the insert failure details.',
-    });
+    if (/row-level security policy|SUPABASE_SERVICE_ROLE_KEY|Supabase is not configured/i.test(message)) {
+      response.status(503).json({ error: message });
+      return;
+    }
+
+    response.status(500).json({ error: message });
   }
 }

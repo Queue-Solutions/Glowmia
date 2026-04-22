@@ -13,6 +13,10 @@ export type SavedDesignRecord = {
   notes: string;
   isOrdered: boolean;
   createdAt: string;
+  sessionId?: string | null;
+  language?: 'en' | 'ar';
+  customerName?: string;
+  customerPhone?: string;
 };
 
 export type CheckoutOrderRecord = {
@@ -129,6 +133,7 @@ type SupabaseLikeError = {
 function getSupabaseKey() {
   return (
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_KEY?.trim() ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
     ''
@@ -160,7 +165,7 @@ function getServerSupabaseClient() {
 }
 
 function hasServiceRoleKey() {
-  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.SUPABASE_KEY?.trim());
 }
 
 function isMissingTableError(message: string) {
@@ -287,6 +292,8 @@ function buildSelect(columns: Set<string>, candidates: readonly string[]) {
 }
 
 function readSavedDesign(row: Record<string, unknown>): SavedDesignRecord {
+  const notes = parseJsonRecord(row.notes);
+
   return {
     id: readString(row.id),
     userId: readOptionalString(row.user_id),
@@ -300,6 +307,10 @@ function readSavedDesign(row: Record<string, unknown>): SavedDesignRecord {
     notes: readString(row.notes),
     isOrdered: readBoolean(row.is_ordered),
     createdAt: readString(row.created_at),
+    sessionId: readOptionalString(notes?.sessionId),
+    language: readString(notes?.language) === 'ar' ? 'ar' : 'en',
+    customerName: readString(notes?.customerName),
+    customerPhone: readString(notes?.customerPhone),
   };
 }
 

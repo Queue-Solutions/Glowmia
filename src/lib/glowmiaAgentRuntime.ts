@@ -1,19 +1,20 @@
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { isLocalAgentBackendUrl, isProductionLikeRuntime } from '@/src/lib/agentBackendConfig';
 
 const RUNTIME_DIR = resolveRuntimeDirectory();
-const RUNTIME_VENV_DIR = resolve(RUNTIME_DIR, 'backend-venv');
+const BACKEND_DIR = resolveBundledBackendDirectory();
+const BACKEND_RUNTIME_SLUG = basename(resolve(BACKEND_DIR, '..')).replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+const RUNTIME_VENV_DIR = resolve(RUNTIME_DIR, `backend-venv-${BACKEND_RUNTIME_SLUG}`);
 const RUNTIME_PYTHON = resolve(
   RUNTIME_VENV_DIR,
   process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
 );
-const BACKEND_DIR = resolve(process.cwd(), 'glowmia-agent', 'backend');
 const BACKEND_REQUIREMENTS = resolve(BACKEND_DIR, 'requirements.txt');
 const BACKEND_OUT_LOG = resolve(RUNTIME_DIR, 'backend.out.log');
 const BACKEND_ERR_LOG = resolve(RUNTIME_DIR, 'backend.err.log');
-const RUNTIME_READY_MARKER = resolve(RUNTIME_VENV_DIR, '.glowmia-agent-ready');
+const RUNTIME_READY_MARKER = resolve(RUNTIME_VENV_DIR, `.glowmia-agent-ready-${BACKEND_RUNTIME_SLUG}`);
 const HEALTH_CHECK_TIMEOUT_MS = 1500;
 const BACKEND_BOOT_TIMEOUT_MS = 45000;
 const EXTRA_BACKEND_PACKAGES = ['replicate'];
@@ -32,6 +33,21 @@ const runtimeState: RuntimeState =
   (global.__glowmiaAgentRuntimeState = {
     startupPromise: null,
   });
+
+function resolveBundledBackendDirectory() {
+  const candidates = [
+    resolve(process.cwd(), 'Glowmia_Codex_Agent', 'backend'),
+    resolve(process.cwd(), 'glowmia-agent', 'backend'),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
+}
 
 function resolveRuntimeDirectory() {
   const configured = process.env.GLOWMIA_AGENT_RUNTIME_DIR?.trim();
@@ -73,7 +89,7 @@ async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: num
 
 async function isBackendHealthy(baseUrl: string) {
   try {
-    const response = await fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/health`, { method: 'GET' }, HEALTH_CHECK_TIMEOUT_MS);
+    const response = await fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/api/v1/health`, { method: 'GET' }, HEALTH_CHECK_TIMEOUT_MS);
     return response.ok;
   } catch {
     return false;
@@ -168,6 +184,14 @@ function spawnBackendProcess(pythonPath: string) {
       stdio: ['ignore', stdoutFd, stderrFd],
       env: {
         ...process.env,
+        SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        SUPABASE_KEY:
+          process.env.SUPABASE_KEY ||
+          process.env.SUPABASE_SERVICE_ROLE_KEY ||
+          process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+          '',
+        REPLICATE_MODEL: process.env.REPLICATE_MODEL || 'black-forest-labs/flux-kontext-pro',
         PYTHONIOENCODING: 'utf-8',
       },
     },

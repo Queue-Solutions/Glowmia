@@ -1,6 +1,6 @@
 const DEVELOPMENT_LOCAL_AGENT_BACKEND_URL = 'http://127.0.0.1:8000';
 const LOCAL_AGENT_BACKEND_HOSTS = new Set(['127.0.0.1', 'localhost']);
-const DEFAULT_AGENT_PROXY_TIMEOUT_MS = 20000;
+const DEFAULT_AGENT_PROXY_TIMEOUT_MS = 90000;
 
 type AgentBackendEnvSource =
   | 'AGENT_BACKEND_URL'
@@ -96,5 +96,5 @@ export function getAgentProxyTimeoutMs() {
     return DEFAULT_AGENT_PROXY_TIMEOUT_MS;
   }
 
-  return Math.min(Math.round(raw), 60000);
+  return Math.min(Math.round(raw), 120000);
 }

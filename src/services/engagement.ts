@@ -44,6 +44,10 @@ export type SavedDesignEntry = {
   notes: string;
   isOrdered: boolean;
   createdAt: string;
+  sessionId?: string | null;
+  language?: 'en' | 'ar';
+  customerName?: string;
+  customerPhone?: string;
 };
 
 export type AdminInsights = {
