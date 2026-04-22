@@ -35,7 +35,7 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
   }, [currentPath]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[color:var(--line)]/80 bg-[color:var(--surface)]/92 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 bg-[color:var(--surface)]/92 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-4 md:px-10">
         <div className="header-brand-cluster">
           <Link
@@ -110,7 +110,7 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
                       exit={{ opacity: 0, x: language === 'ar' ? 12 : -12 }}
                       transition={{ duration: 0.16, delay: index * 0.025 }}
                     >
-                      <Link href={item.href} className={`mobile-menu-link ${isActive ? 'mobile-menu-link--active' : ''}`}>
+                      <Link href={item.href} onClick={() => setMobileMenuOpen(false)} className={`mobile-menu-link ${isActive ? 'mobile-menu-link--active' : ''}`}>
                         <span>{copyFor(language, item.label)}</span>
                       </Link>
                     </motion.div>
@@ -119,7 +119,14 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <button type="button" onClick={toggleLanguage} className="chrome-button flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleLanguage();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="chrome-button flex-1"
+                >
                   {copyFor(language, glowmiaCopy.header.languageToggle)}
                 </button>
               </div>

@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { SiteHeader } from '@/src/components/site/Header';
 import { SiteFooter } from '@/src/components/site/Footer';
-import { CursorAura } from '@/src/components/site/CursorAura';
 
 type SiteLayoutProps = {
   currentPath: string;
@@ -17,7 +16,6 @@ export function SiteLayout({ currentPath, children, immersive = false, showFoote
 
   return (
     <div className={`site-theme ${darkMode ? 'theme-dark' : 'theme-light'} ${language === 'ar' ? 'lang-ar' : ''}`}>
-      <CursorAura />
       <div className="site-background" />
       <div className={`site-shell min-h-screen ${immersive ? 'site-shell--immersive' : ''}`}>
         <SiteHeader currentPath={currentPath} />

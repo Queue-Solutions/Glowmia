@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useRef, useState, type PointerEvent } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Design } from '@/src/data/designs';
 import { glowmiaCopy, copyFor } from '@/src/content/glowmia';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
+import { useFavoritesContext } from '@/src/context/FavoritesContext';
 import { localizeText } from '@/src/data/designs';
 
 export function DesignGallery({ design }: { design: Design }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [likeBurstToken, setLikeBurstToken] = useState<number | null>(null);
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const { language } = useSitePreferencesContext();
+  const { isFavorite, toggleFavorite } = useFavoritesContext();
 
   const baseViews = [
     {
@@ -46,6 +50,41 @@ export function DesignGallery({ design }: { design: Design }) {
     setActiveIndex((current) => (current + 1) % selectableViews.length);
   };
 
+  const triggerLikeBurst = () => {
+    const nextToken = Date.now();
+    setLikeBurstToken(nextToken);
+    window.setTimeout(() => {
+      setLikeBurstToken((currentToken) => (currentToken === nextToken ? null : currentToken));
+    }, 720);
+  };
+
+  const likeDesign = () => {
+    if (!isFavorite(design.id)) {
+      toggleFavorite(design.id);
+    }
+
+    triggerLikeBurst();
+  };
+
+  const handleGalleryPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'touch' || (event.target as HTMLElement).closest('button')) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastTap = lastTapRef.current;
+    const x = event.clientX;
+    const y = event.clientY;
+
+    if (lastTap && now - lastTap.time < 320 && Math.hypot(x - lastTap.x, y - lastTap.y) < 28) {
+      lastTapRef.current = null;
+      likeDesign();
+      return;
+    }
+
+    lastTapRef.current = { time: now, x, y };
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-3">
@@ -53,7 +92,7 @@ export function DesignGallery({ design }: { design: Design }) {
           {copyFor(language, glowmiaCopy.detail.galleryLabel)}
         </p>
         <div className="detail-gallery__frame">
-          <div className="detail-gallery__stage">
+          <div className="detail-gallery__stage" onPointerUp={handleGalleryPointerUp}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeView.id}
@@ -73,6 +112,20 @@ export function DesignGallery({ design }: { design: Design }) {
                   sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </motion.div>
+            </AnimatePresence>
+            <AnimatePresence>
+              {likeBurstToken ? (
+                <motion.div
+                  key={likeBurstToken}
+                  className="detail-gallery__like-burst"
+                  initial={{ opacity: 0, scale: 0.72, y: 10 }}
+                  animate={{ opacity: [0, 1, 0], scale: [0.72, 1.18, 1], y: [10, -4, -18] }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.68, ease: 'easeOut' }}
+                >
+                  <Heart className="h-12 w-12 fill-current" />
+                </motion.div>
+              ) : null}
             </AnimatePresence>
             {hasMultipleViews ? (
               <div className="detail-gallery__arrows" aria-label={language === 'ar' ? 'تصفح صور التصميم' : 'Cycle design images'}>

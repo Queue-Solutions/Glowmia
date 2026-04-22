@@ -86,14 +86,14 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
           </div>
         </div>
 
-        <div className="space-y-2 px-1 pb-1 pt-4">
-          <div className="space-y-1">
-            <h3 className="text-xl font-semibold tracking-[-0.02em] text-[color:var(--text-primary)]">
+        <div className="design-card__content">
+          <div className="design-card__copy">
+            <h3 className="design-card__title">
               {localizeText(language, design.name)}
             </h3>
-            <p className="text-sm text-[color:var(--text-muted)]">{localizeText(language, design.subtitle)}</p>
+            <p className="design-card__subtitle">{localizeText(language, design.subtitle)}</p>
           </div>
-          <p className="line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">
+          <p className="design-card__description">
             {localizeText(language, design.description)}
           </p>
         </div>

@@ -107,7 +107,7 @@ export default function DesignsPage({ designs }: InferGetStaticPropsType<typeof 
           </div>
 
           {filteredDesigns.length > 0 ? (
-            <DesignGrid designs={filteredDesigns} priorityCount={4} />
+            <DesignGrid designs={filteredDesigns} priorityCount={2} />
           ) : (
             <div className="rounded-[2rem] border border-dashed border-[color:var(--line)] px-6 py-12 text-center">
               <h2 className="font-display text-3xl text-[color:var(--text-primary)]">

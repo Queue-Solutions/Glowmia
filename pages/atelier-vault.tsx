@@ -71,7 +71,7 @@ const splitCsv = (value: string) => value.split(',').map((entry) => entry.trim()
 const adminCopy = {
   en: {
     adminAccess: 'Admin access',
-    pageTitle: 'Glowmia Admin',
+    pageTitle: 'HI GHADA',
     pageDescription: 'Manage the live catalog with a focused editor, bilingual fields, and direct image uploads.',
     addDesign: 'Add design',
     signOut: 'Sign out',
@@ -158,7 +158,7 @@ const adminCopy = {
   },
   ar: {
     adminAccess: 'وصول المشرف',
-    pageTitle: 'لوحة Glowmia',
+    pageTitle: 'مرحباً غادة',
     pageDescription: 'إدارة الكتالوج المباشر من خلال محرر مركّز وحقول ثنائية اللغة ورفع مباشر للصور.',
     addDesign: 'إضافة تصميم',
     signOut: 'تسجيل الخروج',
