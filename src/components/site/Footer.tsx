@@ -13,16 +13,6 @@ function InstagramIcon({ className }: { className?: string }) {
   );
 }
 
-function SnapchatIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M12 3.75c-2.25 0-3.9 1.66-3.9 4.18v2.28c0 .72-.42 1.18-1.16 1.42l-1.05.34c.62 1.22 1.7 1.8 2.82 2.05-.24.56-.72 1.02-1.42 1.34 1.26.33 2.3.35 3.12.08.5.62.98.82 1.59.82s1.09-.2 1.59-.82c.82.27 1.86.25 3.12-.08-.7-.32-1.18-.78-1.42-1.34 1.12-.25 2.2-.83 2.82-2.05l-1.05-.34c-.74-.24-1.16-.7-1.16-1.42V7.93c0-2.52-1.65-4.18-3.9-4.18Z" />
-      <path d="M9.8 8.5h.02" />
-      <path d="M14.18 8.5h.02" />
-    </svg>
-  );
-}
-
 function TikTokIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
@@ -33,19 +23,31 @@ function TikTokIcon({ className }: { className?: string }) {
   );
 }
 
-function FacebookIcon({ className }: { className?: string }) {
+function MailIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M14.2 8.2h2.2V4.7h-2.6c-2.8 0-4.4 1.67-4.4 4.45v2.05H7.1v3.65h2.3V20h4.05v-5.15h2.68l.47-3.65h-3.15V9.62c0-.92.28-1.42.75-1.42Z" />
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+      <path d="M4.5 7l7.5 6 7.5-6" />
     </svg>
   );
 }
 
 const socialLinks = [
-  { label: 'Instagram', href: '#', Icon: InstagramIcon },
-  { label: 'Snapchat', href: '#', Icon: SnapchatIcon },
-  { label: 'TikTok', href: '#', Icon: TikTokIcon },
-  { label: 'Facebook', href: '#', Icon: FacebookIcon },
+  {
+    label: 'Instagram',
+    href: 'https://www.instagram.com/glowmia.sa?igsh=NXB1eG1nODVmYXd4',
+    Icon: InstagramIcon,
+  },
+  {
+    label: 'TikTok',
+    href: 'https://www.tiktok.com/@glowmia.sa?_r=1&_t=ZS-95lFRnH2fDe',
+    Icon: TikTokIcon,
+  },
+  {
+    label: 'Email',
+    href: 'mailto:ghadah_111@hotmail.com',
+    Icon: MailIcon,
+  },
 ];
 
 export function SiteFooter() {
@@ -55,11 +57,10 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="site-footer__inner">
         <div className="site-footer__brand">
-          <span className="site-footer__mark">
-            G
-          </span>
+          <Link href="/" aria-label="Glowmia" className="site-footer__mark">
+            <Image src="/glowmia-logo.svg" alt="Glowmia" width={164} height={44} className="site-footer__brand-logo" />
+          </Link>
           <div className="site-footer__brand-copy">
-            <p className="site-footer__logo">Glowmia</p>
             <p className="site-footer__strapline">{copyFor(language, glowmiaCopy.footer.strapline)}</p>
           </div>
         </div>
@@ -73,6 +74,8 @@ export function SiteFooter() {
                 aria-label={label}
                 title={label}
                 className="site-footer__social-link"
+                target={href.startsWith('http') ? '_blank' : undefined}
+                rel={href.startsWith('http') ? 'noreferrer' : undefined}
               >
                 <Icon className="site-footer__social-icon" />
               </a>

@@ -318,6 +318,66 @@ function getEditingImageUrl(dress: AgentDress) {
   return dress.front_view_url || dress.detail_image_url || dress.image_url || dress.cover_image_url || '';
 }
 
+function normalizeIntentText(value: string) {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function isLikelyEditInstruction(message: string, language: 'en' | 'ar') {
+  const normalized = normalizeIntentText(message);
+
+  if (!normalized) {
+    return false;
+  }
+
+  const directEditPatterns = [
+    /\bedit\b/,
+    /\bmodify\b/,
+    /\bretouch\b/,
+    /\bchange (?:the |this |that |my )?(?:dress|image|look|color|fabric|sleeves?|neckline|slit|length|fit|silhouette|shape)\b/,
+    /\bmake (?:it|this|that|the dress)\b/,
+    /\bturn (?:it|this|that|the dress)\b/,
+    /\badd\b/,
+    /\bremove\b/,
+    /\breplace\b/,
+    /\bswap\b/,
+    /\bshorten\b/,
+    /\blengthen\b/,
+    /\bclose\b/,
+    /\bopen\b/,
+    /\badjust\b/,
+    /\bgive it\b/,
+  ];
+
+  if (directEditPatterns.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  if (language === 'ar') {
+    const arabicEditTerms = [
+      'عدل',
+      'عدلي',
+      'غير',
+      'غيّر',
+      'خليه',
+      'خلّيه',
+      'خليها',
+      'خلّيها',
+      'ضيف',
+      'أضيف',
+      'شيلي',
+      'شيل',
+      'افتح',
+      'اقفل',
+      'قصري',
+      'طولي',
+    ];
+
+    return arabicEditTerms.some((term) => normalized.includes(term));
+  }
+
+  return false;
+}
+
 function buildSelectedDressFromResponse(
   response: AgentChatResponse,
   currentSelectedDress: AgentDress | null,
@@ -415,6 +475,7 @@ export function AgentExperience() {
         .find((message): message is AgentEditMessage => message.type === 'edit') ?? null,
     [messages],
   );
+  const draftLooksLikeEdit = Boolean(selectedDress && isLikelyEditInstruction(input, language));
   const shouldShowFeedbackPrompt =
     hasEditResult && feedbackReady && !loading && !input.trim() && !feedbackDismissed && feedbackState !== 'saved';
   const activeAgentRating = hoveredAgentRating || agentRating;
@@ -567,6 +628,7 @@ export function AgentExperience() {
 
   async function handleSend(overrideInput?: string) {
     const trimmed = (overrideInput ?? input).trim();
+    const shouldRouteToEdit = Boolean(selectedDress && isLikelyEditInstruction(trimmed, language));
 
     if (!trimmed || !sessionId || loading) {
       return;
@@ -594,7 +656,7 @@ export function AgentExperience() {
         language,
         selectedDressId: selectedDress?.id ?? null,
         selectedDressImageUrl: selectedDress ? getEditingImageUrl(selectedDress) : null,
-        modeHint: mode === 'edit' && selectedDress ? 'edit' : null,
+        modeHint: shouldRouteToEdit ? 'edit' : null,
       });
 
       if (response.tool === 'edit' && selectedDress) {
@@ -841,7 +903,7 @@ export function AgentExperience() {
                   </div>
                 </section>
 
-                <section className="agent-console__section">
+                <section className="agent-console__section agent-console__section--selected-look">
                   <div className="agent-console__section-head">
                     <h2>{copy.promptTitle}</h2>
                   </div>
@@ -1381,7 +1443,7 @@ export function AgentExperience() {
                     }
                   }}
                   onKeyDown={handleComposerKeyDown}
-                  placeholder={mode === 'edit' && selectedDress ? copy.composerEditPlaceholder : copy.composerPlaceholder}
+                  placeholder={draftLooksLikeEdit ? copy.composerEditPlaceholder : copy.composerPlaceholder}
                   className="agent-composer__input no-scrollbar"
                   rows={1}
                 />
@@ -1391,7 +1453,7 @@ export function AgentExperience() {
                   className="agent-composer__submit"
                   onClick={() => void handleSend()}
                   disabled={!input.trim() || loading || !sessionId || bootstrapping}
-                  aria-label={loading ? copy.sending : mode === 'edit' ? copy.applyEdit : copy.send}
+                  aria-label={loading ? copy.sending : draftLooksLikeEdit ? copy.applyEdit : copy.send}
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
                 </button>

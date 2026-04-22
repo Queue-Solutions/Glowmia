@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode, type SyntheticEvent } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps, InferGetServerSidePropsType } from 'next';
@@ -15,6 +15,8 @@ type AdminPageProps = { configured: boolean; authenticated: boolean; designs: De
 type EditorMode = 'create' | 'edit' | null;
 type OptionItem = { value: string; en: string; ar: string };
 type AdminView = 'catalog' | 'insights' | 'orders';
+
+const ADMIN_PREVIEW_FALLBACK_IMAGE = '/glowmia-logo.svg';
 
 type AdminFormState = {
   name: string;
@@ -67,6 +69,23 @@ const initialAdminForm: AdminFormState = {
 };
 
 const splitCsv = (value: string) => value.split(',').map((entry) => entry.trim()).filter(Boolean);
+
+function resolvePreviewImage(...values: Array<string | null | undefined>) {
+  return values.find((value) => typeof value === 'string' && value.trim())?.trim() || ADMIN_PREVIEW_FALLBACK_IMAGE;
+}
+
+function getSavedOrderPreviewImage(editedImageUrl: string, originalImageUrl: string) {
+  return resolvePreviewImage(editedImageUrl, originalImageUrl);
+}
+
+function getCheckoutOrderPreviewImage(item: CheckoutOrderEntry['items'][number]) {
+  return resolvePreviewImage(item.imageUrl, item.frontViewUrl, item.sideViewUrl, item.backViewUrl);
+}
+
+function handlePreviewImageError(event: SyntheticEvent<HTMLImageElement>) {
+  event.currentTarget.onerror = null;
+  event.currentTarget.src = ADMIN_PREVIEW_FALLBACK_IMAGE;
+}
 
 const adminCopy = {
   en: {
@@ -952,12 +971,17 @@ export default function AtelierVaultPage({
                     <article key={entry.id} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[5.25rem_minmax(0,1fr)]">
                       <button
                         type="button"
-                        onClick={() => setOrderPreview({ src: entry.editedImageUrl, alt: entry.dressName })}
+                        onClick={() => setOrderPreview({ src: getSavedOrderPreviewImage(entry.editedImageUrl, entry.originalImageUrl), alt: entry.dressName })}
                         className="overflow-hidden rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-base)] transition hover:scale-[1.01] hover:border-[color:var(--accent)]"
                         aria-label={insightsUi.viewDesign}
                         title={insightsUi.viewDesign}
                       >
-                        <img src={entry.editedImageUrl} alt={entry.dressName} className="h-24 w-full object-cover object-top sm:h-full" />
+                        <img
+                          src={getSavedOrderPreviewImage(entry.editedImageUrl, entry.originalImageUrl)}
+                          alt={entry.dressName}
+                          className="h-24 w-full object-cover object-top sm:h-full"
+                          onError={handlePreviewImageError}
+                        />
                       </button>
 
                       <div className="space-y-2">
@@ -1075,12 +1099,17 @@ export default function AtelierVaultPage({
                       <article key={`${order.id}-${item.designId}-${item.size ?? 'custom'}`} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
                         <button
                           type="button"
-                          onClick={() => setOrderPreview({ src: item.imageUrl, alt: item.designName })}
+                          onClick={() => setOrderPreview({ src: getCheckoutOrderPreviewImage(item), alt: item.designName })}
                           className="overflow-hidden rounded-[1rem] border border-[color:var(--line)] bg-[color:var(--surface-base)] transition hover:scale-[1.01] hover:border-[color:var(--accent)]"
                           aria-label={insightsUi.viewDesign}
                           title={insightsUi.viewDesign}
                         >
-                          <img src={item.imageUrl} alt={item.designName} className="h-28 w-full object-cover object-top sm:h-full" />
+                          <img
+                            src={getCheckoutOrderPreviewImage(item)}
+                            alt={item.designName}
+                            className="h-28 w-full object-cover object-top sm:h-full"
+                            onError={handlePreviewImageError}
+                          />
                         </button>
 
                         <div className="space-y-2">
@@ -1447,7 +1476,12 @@ export default function AtelierVaultPage({
                     {ui.close}
                   </button>
 
-                  <img src={orderPreview.src} alt={orderPreview.alt} className="max-h-[85vh] w-auto max-w-full rounded-[1.2rem] object-contain" />
+                  <img
+                    src={resolvePreviewImage(orderPreview.src)}
+                    alt={orderPreview.alt}
+                    className="max-h-[85vh] w-auto max-w-full rounded-[1.2rem] object-contain"
+                    onError={handlePreviewImageError}
+                  />
                 </div>
               </motion.div>
             </motion.div>

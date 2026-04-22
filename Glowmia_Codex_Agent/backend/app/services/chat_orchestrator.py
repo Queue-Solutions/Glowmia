@@ -132,6 +132,25 @@ class ChatOrchestrator:
             return f"لون الفستان المختار حالياً هو {current_color}."
         return f"The currently selected dress is {current_color}."
 
+    async def _resolve_intent(self, session: ChatSession, payload: ChatMessageRequest, language: Language) -> str:
+        detected_intent = await self.intent_router.detect_intent(payload.message, language)
+
+        if payload.mode_hint == "edit":
+            has_edit_context = bool(
+                payload.selected_dress_id
+                or session.selected_dress_id
+                or payload.selected_dress_image_url
+                or session.current_image_url
+            )
+            if has_edit_context and detected_intent == "edit":
+                return "edit"
+            return detected_intent
+
+        if payload.mode_hint in {"recommend", "styling", "chat"}:
+            return payload.mode_hint
+
+        return detected_intent
+
     async def handle_message(self, payload: ChatMessageRequest) -> ChatResponse:
         session = self.session_store.get(payload.session_id)
         if session is None:
@@ -143,7 +162,7 @@ class ChatOrchestrator:
         if payload.selected_dress_image_url:
             self.session_store.set_current_image(session.id, payload.selected_dress_image_url)
 
-        intent = payload.mode_hint or await self.intent_router.detect_intent(payload.message, language)
+        intent = await self._resolve_intent(session, payload, language)
         parsed_data = self.recommendation_service.analyze_preferences(payload.message) if intent == "recommend" else None
 
         if intent == "edit":

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -29,13 +30,43 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
   const { darkMode, language, toggleDarkMode, toggleLanguage } = useSitePreferencesContext();
   const { totalQuantity, hydrated } = useCartContext();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAgentHeaderHidden, setIsAgentHeaderHidden] = useState(false);
 
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [currentPath]);
 
+  useEffect(() => {
+    if (currentPath !== '/agent') {
+      setIsAgentHeaderHidden(false);
+      return;
+    }
+
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      const nextScrollY = window.scrollY;
+      const scrollingDown = nextScrollY > lastScrollY;
+      const movedEnough = Math.abs(nextScrollY - lastScrollY) > 10;
+      const shouldHide = nextScrollY > 64 && scrollingDown && movedEnough && !mobileMenuOpen;
+
+      if (nextScrollY <= 16 || !scrollingDown || mobileMenuOpen) {
+        setIsAgentHeaderHidden(false);
+      } else if (shouldHide) {
+        setIsAgentHeaderHidden(true);
+      }
+
+      lastScrollY = nextScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [currentPath, mobileMenuOpen]);
+
   return (
-    <header className="sticky top-0 z-40 bg-[color:var(--surface)]/92 backdrop-blur-xl">
+    <header
+      className={`site-header sticky top-0 z-40 bg-[color:var(--surface)]/92 backdrop-blur-xl ${isAgentHeaderHidden ? 'site-header--hidden' : ''}`}
+    >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-4 md:px-10">
         <div className="header-brand-cluster">
           <Link
@@ -48,8 +79,8 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
             {hydrated && totalQuantity > 0 ? <span className="cart-nav-badge">{totalQuantity}</span> : null}
           </Link>
 
-          <Link href="/" className="flex items-center gap-3 text-[color:var(--text-primary)] transition-opacity hover:opacity-80">
-            <span className="font-display text-2xl leading-none">Glowmia</span>
+          <Link href="/" className="flex items-center text-[color:var(--text-primary)] transition-opacity hover:opacity-80" aria-label="Glowmia">
+            <Image src="/glowmia-logo.svg" alt="Glowmia" width={164} height={44} priority className="h-9 w-auto md:h-10" />
           </Link>
         </div>
 
