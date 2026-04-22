@@ -20,8 +20,7 @@ async def create_session(
     return orchestrator.create_session(payload.language)
 
 
-@router.post("/chat/message", response_model=ChatResponse)
-async def send_message(
+async def _send_message(
     payload: ChatMessageRequest,
     orchestrator: ChatOrchestrator = Depends(get_chat_orchestrator),
 ) -> ChatResponse:
@@ -31,3 +30,19 @@ async def send_message(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def send_message(
+    payload: ChatMessageRequest,
+    orchestrator: ChatOrchestrator = Depends(get_chat_orchestrator),
+) -> ChatResponse:
+    return await _send_message(payload, orchestrator)
+
+
+@router.post("/chat/message", response_model=ChatResponse)
+async def send_message_legacy(
+    payload: ChatMessageRequest,
+    orchestrator: ChatOrchestrator = Depends(get_chat_orchestrator),
+) -> ChatResponse:
+    return await _send_message(payload, orchestrator)
