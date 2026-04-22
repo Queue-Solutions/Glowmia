@@ -24,5 +24,11 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "Glowmia_Codex_Agent",
+    "Glowmia_Codex_Agent/frontend",
+    "glowmia-agent"
+  ]
 }
