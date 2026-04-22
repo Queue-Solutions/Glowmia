@@ -24,10 +24,20 @@ class ReplicateService:
         }
 
     def _model_prediction_url(self, model_identifier: str) -> str:
-        if ":" in model_identifier:
+        normalized_identifier = model_identifier.strip()
+        if not normalized_identifier:
+            raise RuntimeError("Replicate model identifier is not configured")
+
+        if ":" in normalized_identifier:
             return f"{self.base_url}/predictions"
-        owner, name = model_identifier.split("/", maxsplit=1)
-        return f"{self.base_url}/models/{owner}/{name}/predictions"
+
+        owner, separator, name = normalized_identifier.partition("/")
+        if not separator or not owner.strip() or not name.strip():
+            raise RuntimeError(
+                "Replicate model identifier must use the format owner/name or version hash"
+            )
+
+        return f"{self.base_url}/models/{owner.strip()}/{name.strip()}/predictions"
 
     async def generate_text(
         self,

@@ -30,6 +30,8 @@ async def _send_message(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Chat request failed unexpectedly") from exc
 
 
 @router.post("/chat", response_model=ChatResponse)
