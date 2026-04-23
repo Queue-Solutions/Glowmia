@@ -82,7 +82,7 @@ export default function DesignsPage({ designs }: InferGetStaticPropsType<typeof 
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex flex-wrap gap-2 pb-1 sm:flex-nowrap sm:overflow-x-auto sm:no-scrollbar">
               {filterOrder.map((filterKey) => (
                 <button
                   key={filterKey}

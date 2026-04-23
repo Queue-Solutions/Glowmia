@@ -1,45 +1,9 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(128 122) rotate(90) scale(116)">
-      <stop stop-color="#2F2A28"/>
-      <stop offset="1" stop-color="#0F0E0D"/>
-    </radialGradient>
-    <linearGradient id="gold" x1="58" y1="36" x2="196" y2="218" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F8E1A8"/>
-      <stop offset="0.45" stop-color="#D7AE63"/>
-      <stop offset="1" stop-color="#8F6634"/>
-    </linearGradient>
-    <linearGradient id="goldSoft" x1="73" y1="58" x2="176" y2="188" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFF0C7"/>
-      <stop offset="0.55" stop-color="#DDB06A"/>
-      <stop offset="1" stop-color="#A7783D"/>
-    </linearGradient>
-    <filter id="shadow" x="27" y="21" width="202" height="214" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.3"/>
-    </filter>
-  </defs>
-
-  <circle cx="128" cy="128" r="105" fill="url(#glow)"/>
-  <circle cx="128" cy="128" r="98" stroke="url(#gold)" stroke-width="7"/>
-  <circle cx="128" cy="128" r="86" stroke="rgba(255,235,187,0.18)" stroke-width="1.5"/>
-
-  <g filter="url(#shadow)" stroke="url(#goldSoft)" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M124 69C124 61.3 130.2 55 138 55C145.8 55 152 61.3 152 69C152 76.7 145.8 83 138 83H127.5" stroke-width="5.5"/>
-    <path d="M126 80C122.8 73.8 117.4 70.6 109.5 71C101.1 71.4 96 77.5 96 85.6C96 93.4 101.3 98.5 109 100.3" stroke-width="5"/>
-    <path d="M132 82C138.5 88.6 142 97.6 142 109C142 122.5 136.2 135.2 124.2 146.5" stroke-width="5.5"/>
-    <path d="M127 87C116.6 96.2 111.2 109 111.2 125.5C111.2 150.4 123.8 171.9 148.8 188.4" stroke-width="5"/>
-    <path d="M139.4 83.5C148.1 92.9 152.5 104.2 152.5 117.6C152.5 132.8 147.2 146 136 157.1" stroke-width="4.5"/>
-    <path d="M150 88.5C159.2 98.6 164.2 110.2 164.2 124.8C164.2 143.3 156.5 160.5 141.4 176.5" stroke-width="4.5"/>
-    <path d="M123.6 149.6C114.4 167.6 103 180.5 88.8 188.4C106 192.7 124.7 191.7 144.8 185.6" stroke-width="5"/>
-    <path d="M122.8 151.2C111.2 169.3 100.2 182.2 89.8 189.8C79.4 197.3 69.3 201.8 59.4 203.4C75.5 206.8 91.9 205.3 108.4 198.8" stroke-width="4.2"/>
-    <path d="M137 157C149.2 169.6 162.5 178.1 176.8 182.6C183.2 184.6 190 185.3 197 184.8C192.4 178.6 186.7 174.1 179.8 171.1" stroke-width="4.8"/>
-    <path d="M154 104.6C165.4 89.6 179.4 80.4 196 76.8C187.8 89.4 179.5 99.1 171 106" stroke-width="5"/>
-    <path d="M151 116.8C165.6 112.6 180.5 115.6 195.5 125.7C182 131.6 168.3 133.4 154.4 131.1" stroke-width="4.5"/>
-    <path d="M154.5 141C167.5 141.9 178.9 147.2 188.8 156.8C176.9 160.2 165.4 159.6 154.3 154.9" stroke-width="4.3"/>
-    <path d="M100.8 109.5C90.6 95.5 76.3 87.2 58 84.6C67.8 99.1 78.4 109.9 89.8 117" stroke-width="5"/>
-    <path d="M99.2 124.8C84.8 118.4 69.3 118.2 52.7 124.3C66.8 133.2 81.7 136.3 97.4 133.5" stroke-width="4.5"/>
-    <path d="M100.8 147.5C88.6 149.4 78 154.8 69.1 163.6C80.8 168 92.2 168.5 103.1 165.2" stroke-width="4.2"/>
-  </g>
-
-  <path d="M136 72C140.2 72 143.6 75.4 143.6 79.6C143.6 83.8 140.2 87.2 136 87.2C131.8 87.2 128.4 83.8 128.4 79.6C128.4 75.4 131.8 72 136 72Z" fill="url(#goldSoft)"/>
+  <circle cx="128" cy="128" r="99" fill="#F2E7D5"/>
+  <circle cx="128" cy="83" r="35" fill="#11110F"/>
+  <circle cx="83" cy="128" r="35" fill="#11110F"/>
+  <circle cx="173" cy="128" r="35" fill="#11110F"/>
+  <circle cx="128" cy="173" r="35" fill="#11110F"/>
+  <circle cx="128" cy="128" r="49" fill="#11110F"/>
+  <circle cx="128" cy="128" r="18" fill="#F2E7D5"/>
 </svg>

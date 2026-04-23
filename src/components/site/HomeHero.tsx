@@ -8,8 +8,12 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 
 const heroLooks = [
   {
-    src: '/dresses/covers/home-page.png',
-    alt: 'Glowmia burgundy evening dress',
+    src: '/dresses/covers/dress-7-cover.png',
+    alt: 'Glowmia rust evening dress',
+  },
+  {
+    src: '/dresses/covers/dress-2-cover.png',
+    alt: 'Glowmia taupe evening dress',
   },
   {
     src: '/dresses/covers/dress-8-cover.png',
@@ -18,6 +22,10 @@ const heroLooks = [
   {
     src: '/dresses/covers/dress-6-cover.png',
     alt: 'Glowmia black evening dress',
+  },
+  {
+    src: '/dresses/covers/dress-9-cover.png',
+    alt: 'Glowmia embellished evening dress',
   },
 ];
 

@@ -67,8 +67,8 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
     <header
       className={`site-header sticky top-0 z-40 bg-[color:var(--surface)]/92 backdrop-blur-xl ${isAgentHeaderHidden ? 'site-header--hidden' : ''}`}
     >
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-4 md:px-10">
-        <div className="header-brand-cluster">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:px-10">
+        <div className="hidden items-center gap-2 md:flex md:justify-self-start">
           <Link
             href="/cart"
             className={`header-cart-link ${currentPath === '/cart' ? 'header-cart-link--active' : ''}`}
@@ -78,13 +78,15 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
             <ShoppingCart className="h-[1.05rem] w-[1.05rem]" />
             {hydrated && totalQuantity > 0 ? <span className="cart-nav-badge">{totalQuantity}</span> : null}
           </Link>
-
-          <Link href="/" className="flex items-center text-[color:var(--text-primary)] transition-opacity hover:opacity-80" aria-label="Glowmia">
-            <Image src="/glowmia-logo.svg" alt="Glowmia" width={164} height={44} priority className="h-9 w-auto md:h-10" />
-          </Link>
+          <button type="button" onClick={toggleLanguage} className="chrome-button min-w-[6.75rem]">
+            {copyFor(language, glowmiaCopy.header.languageToggle)}
+          </button>
+          <button type="button" onClick={toggleDarkMode} className="chrome-button chrome-icon-button" aria-label={copyFor(language, glowmiaCopy.header.themeToggle)}>
+            {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
         </div>
 
-        <nav className="hidden items-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)]/92 p-1 md:flex">
+        <nav className="hidden items-center rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)]/92 p-1 md:flex md:justify-self-center">
           {glowmiaCopy.header.nav.map((item) => {
             const isActive = currentPath === item.href;
             const Icon = navIcons[item.href as keyof typeof navIcons] ?? Shirt;
@@ -100,16 +102,20 @@ export function SiteHeader({ currentPath }: SiteHeaderProps) {
           })}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
-          <button type="button" onClick={toggleLanguage} className="chrome-button min-w-[6.75rem]">
-            {copyFor(language, glowmiaCopy.header.languageToggle)}
-          </button>
-          <button type="button" onClick={toggleDarkMode} className="chrome-button chrome-icon-button" aria-label={copyFor(language, glowmiaCopy.header.themeToggle)}>
-            {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-        </div>
+        <Link href="/" className="hidden items-center justify-self-end transition-transform hover:-translate-y-[1px] md:inline-flex" aria-label="Glowmia">
+          <Image src="/glowmia-logo.svg" alt="Glowmia" width={44} height={44} priority className="h-11 w-11" />
+        </Link>
 
         <div className="flex items-center gap-2 md:hidden">
+          <Link
+            href="/cart"
+            className={`header-cart-link ${currentPath === '/cart' ? 'header-cart-link--active' : ''}`}
+            aria-label={copyFor(language, glowmiaCopy.cart.title)}
+            title={copyFor(language, glowmiaCopy.cart.title)}
+          >
+            <ShoppingCart className="h-[1.05rem] w-[1.05rem]" />
+            {hydrated && totalQuantity > 0 ? <span className="cart-nav-badge">{totalQuantity}</span> : null}
+          </Link>
           <button type="button" onClick={toggleDarkMode} className="chrome-button chrome-icon-button" aria-label={copyFor(language, glowmiaCopy.header.themeToggle)}>
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>

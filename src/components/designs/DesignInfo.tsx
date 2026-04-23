@@ -8,6 +8,7 @@ import { useFavoritesContext } from '@/src/context/FavoritesContext';
 import { useCartContext } from '@/src/context/CartContext';
 import { cartSizes, type CartSize } from '@/src/hooks/useCart';
 import { localizeText } from '@/src/data/designs';
+import { SizeChartButton } from '@/src/components/designs/SizeChartButton';
 
 export function DesignInfo({ design }: { design: Design }) {
   const { language } = useSitePreferencesContext();
@@ -61,9 +62,12 @@ export function DesignInfo({ design }: { design: Design }) {
 
       <section className="cart-detail-panel cart-detail-panel--merged">
         <div>
-          <p className="text-sm uppercase tracking-[0.24em] text-[color:var(--text-muted)]">
-            {copyFor(language, glowmiaCopy.cart.sizeLabel)}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm uppercase tracking-[0.24em] text-[color:var(--text-muted)]">
+              {copyFor(language, glowmiaCopy.cart.sizeLabel)}
+            </p>
+            <SizeChartButton />
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {cartSizes.map((size) => (
               <button
