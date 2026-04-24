@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { glowmiaCopy, copyFor } from '@/src/content/glowmia';
+import { NewsletterSignup } from '@/src/components/site/NewsletterSignup';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 
 function InstagramIcon({ className }: { className?: string }) {
@@ -64,6 +65,8 @@ export function SiteFooter() {
             <p className="site-footer__strapline">{copyFor(language, glowmiaCopy.footer.strapline)}</p>
           </div>
         </div>
+
+        <NewsletterSignup />
 
         <div className="site-footer__meta">
           <div className="site-footer__socials">

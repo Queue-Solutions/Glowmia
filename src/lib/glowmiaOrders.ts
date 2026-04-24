@@ -6,6 +6,7 @@ export type SavedDesignRecord = {
   guestId: string | null;
   dressId: string;
   orderId: string | null;
+  email?: string | null;
   originalImageUrl: string;
   editedImageUrl: string;
   prompt: string;
@@ -17,6 +18,7 @@ export type SavedDesignRecord = {
   language?: 'en' | 'ar';
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
 };
 
 export type CheckoutOrderRecord = {
@@ -24,6 +26,7 @@ export type CheckoutOrderRecord = {
   customer: {
     name: string;
     phone: string;
+    email?: string;
     address: string;
     city: string;
   };
@@ -63,6 +66,7 @@ type SaveDesignInput = {
   userId: string | null;
   guestId: string | null;
   dressId: string;
+  email?: string | null;
   originalImageUrl: string;
   editedImageUrl: string;
   prompt?: string | null;
@@ -90,6 +94,7 @@ const SAVED_DESIGN_FIELDS = [
   'guest_id',
   'dress_id',
   'order_id',
+  'email',
   'original_image_url',
   'edited_image_url',
   'prompt',
@@ -111,6 +116,7 @@ const ORDER_FIELDS = [
   'edited_image_url',
   'customer_name',
   'phone',
+  'email',
   'address',
   'city',
   'size',
@@ -300,6 +306,7 @@ function readSavedDesign(row: Record<string, unknown>): SavedDesignRecord {
     guestId: readOptionalString(row.guest_id),
     dressId: readString(row.dress_id),
     orderId: readOptionalString(row.order_id),
+    email: readOptionalString(row.email),
     originalImageUrl: readString(row.original_image_url),
     editedImageUrl: readString(row.edited_image_url),
     prompt: readString(row.prompt),
@@ -311,6 +318,7 @@ function readSavedDesign(row: Record<string, unknown>): SavedDesignRecord {
     language: readString(notes?.language) === 'ar' ? 'ar' : 'en',
     customerName: readString(notes?.customerName),
     customerPhone: readString(notes?.customerPhone),
+    customerEmail: readString(notes?.customerEmail),
   };
 }
 
@@ -322,6 +330,7 @@ function readCheckoutOrder(row: Record<string, unknown>) {
     customer: {
       name: readString(row.customer_name),
       phone: readString(row.phone),
+      email: readString(row.email),
       address: readString(row.address),
       city: readString(row.city),
     },
@@ -368,6 +377,10 @@ export async function saveAgentDesign(input: SaveDesignInput) {
 
   if (columns.has('order_id') && input.orderId) {
     payload.order_id = input.orderId;
+  }
+
+  if (columns.has('email') && input.email) {
+    payload.email = input.email.trim();
   }
 
   if (columns.has('original_image_url')) {
@@ -507,6 +520,10 @@ export async function createCheckoutOrders(input: CreateOrderRowsInput) {
 
     if (columns.has('phone')) {
       row.phone = input.customer.phone;
+    }
+
+    if (columns.has('email') && input.customer.email) {
+      row.email = input.customer.email;
     }
 
     if (columns.has('address')) {

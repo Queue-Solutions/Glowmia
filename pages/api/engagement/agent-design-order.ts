@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { randomUUID } from 'crypto';
 import { saveAgentDesign } from '@/src/lib/glowmiaOrders';
+import {
+  isValidNewsletterEmail,
+  normalizeNewsletterEmail,
+  sendDesignConfirmationEmail,
+  trackEmailEvent,
+  upsertNewsletterSubscriber,
+} from '@/src/lib/newsletter';
 
 function readTrimmedString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -35,6 +42,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
   const sessionId = readTrimmedString(request.body?.sessionId) || null;
   const customerName = readTrimmedString(request.body?.customerName);
   const customerPhone = readTrimmedString(request.body?.customerPhone);
+  const customerEmail = normalizeNewsletterEmail(request.body?.customerEmail);
   const userId = readTrimmedString(request.body?.userId);
   const guestId = readTrimmedString(request.body?.guestId);
   const dressId = readTrimmedString(request.body?.dressId);
@@ -48,6 +56,11 @@ export default async function handler(request: NextApiRequest, response: NextApi
 
   if (!dressId || !dressName || !originalImageUrl || !editedImageUrl) {
     response.status(400).json({ error: 'Missing required saved design details.' });
+    return;
+  }
+
+  if (!customerEmail || !isValidNewsletterEmail(customerEmail)) {
+    response.status(400).json({ error: 'A valid email address is required.' });
     return;
   }
 
@@ -66,6 +79,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
       userId: normalizedUserId || null,
       guestId: normalizedUserId ? null : normalizedGuestId || randomUUID(),
       dressId,
+      email: customerEmail,
       originalImageUrl,
       editedImageUrl,
       prompt,
@@ -75,8 +89,65 @@ export default async function handler(request: NextApiRequest, response: NextApi
         language,
         customerName,
         customerPhone,
+        customerEmail,
       },
       isOrdered: false,
+    });
+
+    await upsertNewsletterSubscriber({
+      email: customerEmail,
+      source: 'designer_request',
+      metadata: {
+        design_id: savedDesign.id,
+        dress_id: dressId,
+        dress_name: dressName,
+        image_url: editedImageUrl,
+        edit_prompt: prompt || null,
+        created_at: savedDesign.createdAt,
+      },
+    });
+
+    await trackEmailEvent({
+      email: customerEmail,
+      eventType: 'design_created',
+      metadata: {
+        design_id: savedDesign.id,
+        dress_id: dressId,
+        dress_name: dressName,
+        image_url: editedImageUrl,
+        edit_prompt: prompt || null,
+        created_at: savedDesign.createdAt,
+      },
+    });
+
+    await trackEmailEvent({
+      email: customerEmail,
+      eventType: 'design_saved',
+      metadata: {
+        design_id: savedDesign.id,
+        dress_id: dressId,
+        dress_name: dressName,
+        image_url: editedImageUrl,
+        edit_prompt: prompt || null,
+        created_at: savedDesign.createdAt,
+      },
+    });
+
+    await trackEmailEvent({
+      email: customerEmail,
+      eventType: 'designer_request',
+      metadata: {
+        design_id: savedDesign.id,
+        dress_id: dressId,
+        dress_name: dressName,
+      },
+    });
+
+    await sendDesignConfirmationEmail({
+      email: customerEmail,
+      dressName: dressName,
+      imageUrl: editedImageUrl,
+      prompt: prompt || null,
     });
 
     response.status(201).json({
@@ -97,6 +168,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
       hasEditedImageUrl: Boolean(editedImageUrl),
       hasUserId: Boolean(normalizedUserId),
       hasGuestId: Boolean(normalizedGuestId),
+      hasCustomerEmail: Boolean(customerEmail),
       hasPrompt: Boolean(prompt),
       sessionId,
       language,

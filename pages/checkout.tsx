@@ -15,6 +15,13 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 import { useCartContext } from '@/src/context/CartContext';
 import type { CartEntry } from '@/src/hooks/useCart';
 import { countryCodeOptions } from '@/src/data/countryCodes';
+import {
+  captureMailingEmail,
+  getStoredContactEmail,
+  isValidClientEmail,
+  normalizeClientEmail,
+  setStoredContactEmail,
+} from '@/src/services/mailing';
 
 type CheckoutPageProps = {
   designs: Design[];
@@ -78,6 +85,7 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     name: '',
     phoneCode: '+20',
     phone: '',
+    email: '',
     address: '',
     city: '',
     notes: '',
@@ -109,8 +117,11 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
 
     const prefillName = typeof router.query.prefillName === 'string' ? router.query.prefillName.trim() : '';
     const prefillPhone = typeof router.query.prefillPhone === 'string' ? router.query.prefillPhone.trim() : '';
+    const prefillEmail =
+      typeof router.query.prefillEmail === 'string' ? normalizeClientEmail(router.query.prefillEmail) : '';
+    const storedEmail = getStoredContactEmail();
 
-    if (!prefillName && !prefillPhone) {
+    if (!prefillName && !prefillPhone && !prefillEmail && !storedEmail) {
       return;
     }
 
@@ -118,8 +129,9 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
       ...current,
       name: current.name || prefillName,
       phone: current.phone || prefillPhone,
+      email: current.email || prefillEmail || storedEmail,
     }));
-  }, [router.isReady, router.query.prefillName, router.query.prefillPhone]);
+  }, [router.isReady, router.query.prefillEmail, router.query.prefillName, router.query.prefillPhone]);
 
   useEffect(() => {
     if (!router.isReady) {
@@ -189,6 +201,17 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     };
   }, [language, router.isReady, router.query.savedDesignId]);
 
+  useEffect(() => {
+    if (!savedDesign?.customerEmail) {
+      return;
+    }
+
+    setFormState((current) => ({
+      ...current,
+      email: current.email || normalizeClientEmail(savedDesign.customerEmail || ''),
+    }));
+  }, [savedDesign?.customerEmail]);
+
   const displayItems = useMemo(() => {
     const cartDisplayItems: DisplayCheckoutItem[] = checkoutItems.map(({ entry, design }) => ({
       key: `${entry.designId}-${entry.size}`,
@@ -225,6 +248,44 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
 
   const totalQuantity = useMemo(() => displayItems.reduce((sum, item) => sum + item.quantity, 0), [displayItems]);
   const hasItems = hydrated && (displayItems.length > 0 || savedDesignState === 'loading');
+  const reminderItems = useMemo(
+    () =>
+      displayItems.map((item) => ({
+        designId: item.kind === 'saved' ? item.savedDesign.dressId : item.design.id,
+        designName: item.designName,
+        imageUrl: item.imageUrl,
+        quantity: item.quantity,
+        size: item.size,
+        href: item.href,
+      })),
+    [displayItems],
+  );
+
+  useEffect(() => {
+    setStoredContactEmail(formState.email);
+  }, [formState.email]);
+
+  useEffect(() => {
+    if (!isValidClientEmail(formState.email) || reminderItems.length === 0) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void captureMailingEmail({
+        email: formState.email,
+        source: 'checkout',
+        items: reminderItems,
+        metadata: {
+          saved_design_id: savedDesign?.id ?? null,
+          item_count: reminderItems.length,
+        },
+      }).catch(() => {});
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [formState.email, reminderItems, savedDesign?.id]);
 
   const updateField = (field: keyof typeof formState, value: string) => {
     setFormState((current) => ({ ...current, [field]: value }));
@@ -258,6 +319,7 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     const fields = {
       customer_name: formState.name,
       phone: fullPhone,
+      customer_email: normalizeClientEmail(formState.email),
       address: formState.address,
       city: formState.city,
       dress_id: joinOrderFieldValues(
@@ -298,12 +360,13 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const requiredFields = [formState.name, formState.phone, formState.address, formState.city];
+    const normalizedEmail = normalizeClientEmail(formState.email);
+    const requiredFields = [formState.name, formState.phone, normalizedEmail, formState.address, formState.city];
     const hasAllFields = requiredFields.every((value) => value.trim());
     const normalizedLocalPhone = formState.phone.replace(/[\s()-]/g, '').replace(/^0+/, '');
     const fullPhone = `${formState.phoneCode}${normalizedLocalPhone}`;
 
-    if (!hasAllFields || displayItems.length === 0) {
+    if (!hasAllFields || !isValidClientEmail(normalizedEmail) || displayItems.length === 0) {
       setSubmitState('error');
       setError(copyFor(language, glowmiaCopy.checkout.requiredError));
       return;
@@ -323,6 +386,7 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
           customer: {
             name: formState.name,
             phone: fullPhone,
+            email: normalizedEmail,
             address: formState.address,
             city: formState.city,
           },
@@ -527,6 +591,18 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
                       inputMode="tel"
                     />
                   </div>
+                </label>
+
+                <label className="checkout-field">
+                  <span>{copyFor(language, glowmiaCopy.checkout.email)}</span>
+                  <input
+                    value={formState.email}
+                    onChange={(event) => updateField('email', event.target.value)}
+                    placeholder={copyFor(language, glowmiaCopy.checkout.emailPlaceholder)}
+                    className="field-input"
+                    inputMode="email"
+                    autoComplete="email"
+                  />
                 </label>
 
                 <label className="checkout-field">

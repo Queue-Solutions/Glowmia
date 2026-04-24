@@ -67,6 +67,20 @@ function ensureRuntimeDirectory() {
   mkdirSync(RUNTIME_DIR, { recursive: true });
 }
 
+function parseLocalBackendTarget(baseUrl: string) {
+  const parsed = new URL(baseUrl);
+  const port = parsed.port ? Number(parsed.port) : parsed.protocol === 'https:' ? 443 : 80;
+
+  if (!Number.isFinite(port) || port <= 0) {
+    throw new Error(`Invalid local agent backend port in ${baseUrl}.`);
+  }
+
+  return {
+    host: parsed.hostname,
+    port: Math.round(port),
+  };
+}
+
 function sleep(ms: number) {
   return new Promise((resolveDelay) => {
     setTimeout(resolveDelay, ms);
@@ -169,15 +183,16 @@ async function installBackendDependencies(pythonPath: string) {
   writeFileSync(RUNTIME_READY_MARKER, `${Date.now()}\n`, 'utf8');
 }
 
-function spawnBackendProcess(pythonPath: string) {
+function spawnBackendProcess(pythonPath: string, baseUrl: string) {
   ensureRuntimeDirectory();
+  const target = parseLocalBackendTarget(baseUrl);
 
   const stdoutFd = openSync(BACKEND_OUT_LOG, 'a');
   const stderrFd = openSync(BACKEND_ERR_LOG, 'a');
 
   const child = spawn(
     pythonPath,
-    ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'],
+    ['-m', 'uvicorn', 'app.main:app', '--host', target.host, '--port', String(target.port)],
     {
       cwd: BACKEND_DIR,
       detached: true,
@@ -217,7 +232,7 @@ async function waitForBackend(baseUrl: string, timeoutMs: number) {
 async function startLocalBackend(baseUrl: string) {
   const pythonPath = await ensureRuntimePython();
   await installBackendDependencies(pythonPath);
-  spawnBackendProcess(pythonPath);
+  spawnBackendProcess(pythonPath, baseUrl);
   await waitForBackend(baseUrl, BACKEND_BOOT_TIMEOUT_MS);
 }
 

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Scissors, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { glowmiaCopy, copyFor } from '@/src/content/glowmia';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
@@ -29,11 +29,6 @@ const heroLooks = [
   },
 ];
 
-const heroDetails = {
-  en: ['Evening silhouettes', 'Made for motion', 'Portfolio edit'],
-  ar: ['قصات مسائية', 'مصممة للحركة', 'اختيار البورتفوليو'],
-};
-
 const HERO_LOOK_INTERVAL = 5400;
 
 export function HomeHero() {
@@ -57,9 +52,9 @@ export function HomeHero() {
       <div className="home-hero__inner">
         <motion.div
           className="home-hero__copy"
-          initial={{ opacity: 0, y: 18 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
         >
           <span className="eyebrow-chip home-hero__eyebrow">
             <Sparkles className="h-4 w-4" />
@@ -98,17 +93,23 @@ export function HomeHero() {
                   initial={
                     isActive
                       ? { opacity: 1, rotateY: 0, rotate: 0, scale: 1, x: 0 }
-                      : { opacity: 0, rotateY: 18, rotate: 2, scale: 0.99, x: -10 }
+                      : { opacity: 0, rotateY: 10, rotate: 1.2, scale: 0.992, x: -6 }
                   }
                   animate={
                     isActive
                       ? { opacity: 1, rotateY: 0, rotate: 0, scale: 1, x: 0 }
-                      : { opacity: 0, rotateY: 18, rotate: 2, scale: 0.99, x: -10 }
+                      : { opacity: 0, rotateY: 10, rotate: 1.2, scale: 0.992, x: -6 }
                   }
                   transition={
                     isActive
-                      ? { duration: 1.35, ease: [0.22, 1, 0.36, 1] }
-                      : { opacity: { duration: 0.08 }, rotateY: { duration: 0.35 }, rotate: { duration: 0.35 }, scale: { duration: 0.35 }, x: { duration: 0.35 } }
+                      ? { duration: 1.1, ease: [0.22, 1, 0.36, 1] }
+                      : {
+                          opacity: { duration: 0.16 },
+                          rotateY: { duration: 0.3 },
+                          rotate: { duration: 0.3 },
+                          scale: { duration: 0.3 },
+                          x: { duration: 0.3 },
+                        }
                   }
                   style={{ zIndex: isActive ? 3 : 1, pointerEvents: 'none', visibility: isActive ? 'visible' : 'hidden' }}
                 >
@@ -119,7 +120,7 @@ export function HomeHero() {
                     priority={index === 0}
                     loading={index === 0 ? 'eager' : 'lazy'}
                     className="home-hero__look-image"
-                    sizes="(max-width: 768px) 68vw, 28vw"
+                    sizes="(max-width: 768px) 74vw, (max-width: 1024px) 56vw, 30vw"
                   />
                 </motion.div>
               );
@@ -131,16 +132,6 @@ export function HomeHero() {
               ))}
             </div>
           </div>
-
-          <motion.div
-            className="home-hero__atelier-note"
-            initial={{ opacity: 0, y: 12, rotate: -4 }}
-            animate={{ opacity: 1, y: 0, rotate: -4 }}
-            transition={{ duration: 0.42, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Scissors className="h-4 w-4" />
-            <span>{heroDetails[language][1]}</span>
-          </motion.div>
         </div>
       </div>
     </section>

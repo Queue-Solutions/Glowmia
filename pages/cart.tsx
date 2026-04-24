@@ -13,6 +13,13 @@ import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { useCartContext } from '@/src/context/CartContext';
 import { fetchSavedDesign, type SavedDesignEntry } from '@/src/services/engagement';
+import {
+  captureMailingEmail,
+  getStoredContactEmail,
+  isValidClientEmail,
+  normalizeClientEmail,
+  setStoredContactEmail,
+} from '@/src/services/mailing';
 
 type CartPageProps = {
   designs: Design[];
@@ -34,6 +41,7 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
   const { language } = useSitePreferencesContext();
   const { entries, totalQuantity, updateQuantity, removeItem, clearCart } = useCartContext();
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const [contactEmail, setContactEmail] = useState('');
   const [savedDesign, setSavedDesign] = useState<SavedDesignEntry | null>(null);
   const [savedDesignState, setSavedDesignState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const [savedDesignError, setSavedDesignError] = useState('');
@@ -113,9 +121,104 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
     () => (savedDesign ? designsById.get(savedDesign.dressId) ?? null : null),
     [designsById, savedDesign],
   );
+  const reminderItems = useMemo(() => {
+    const nextItems: Array<{
+      designId: string;
+      designName: string;
+      imageUrl: string;
+      quantity: number;
+      size: string | null;
+      href: string | null;
+    }> = cartItems.flatMap(({ entry, design }) => {
+      if (!design) {
+        return [];
+      }
+
+      return [
+        {
+          designId: entry.designId,
+          designName: localizeText(language, design.name),
+          imageUrl: design.coverImage,
+          quantity: entry.quantity,
+          size: entry.size,
+          href: `/designs/${design.slug}`,
+        },
+      ];
+    });
+
+    if (savedDesign) {
+      nextItems.unshift({
+        designId: savedDesign.dressId,
+        designName:
+          savedDesign.designName ||
+          (savedDesignBase ? localizeText(language, savedDesignBase.name) : language === 'ar' ? 'تصميم محفوظ' : 'Saved design'),
+        imageUrl: savedDesign.editedImageUrl || savedDesign.originalImageUrl,
+        quantity: 1,
+        size: null,
+        href: savedDesignBase ? `/designs/${savedDesignBase.slug}` : '/cart',
+      });
+    }
+
+    return nextItems;
+  }, [cartItems, language, savedDesign, savedDesignBase]);
 
   const hasItems = cartItems.length > 0 || savedDesignState === 'loading' || Boolean(savedDesign);
   const effectiveItemCount = totalQuantity + (savedDesign ? 1 : 0);
+  const contactCopy =
+    language === 'ar'
+      ? {
+          label: 'البريد الإلكتروني',
+          placeholder: 'name@example.com',
+          note: 'أضيفي بريدك هنا لنحفظ سلتك ونرسل لك تذكيرًا هادئًا إذا توقفتِ قبل إتمام الطلب.',
+        }
+      : {
+          label: 'Email address',
+          placeholder: 'name@example.com',
+          note: 'Add your email so we can keep your cart and send a gentle reminder if you leave before checkout.',
+        };
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const prefillEmail =
+      typeof router.query.prefillEmail === 'string' ? normalizeClientEmail(router.query.prefillEmail) : '';
+    const storedEmail = getStoredContactEmail();
+    const nextEmail = prefillEmail || storedEmail;
+
+    if (!nextEmail) {
+      return;
+    }
+
+    setContactEmail((current) => current || nextEmail);
+  }, [router.isReady, router.query.prefillEmail]);
+
+  useEffect(() => {
+    setStoredContactEmail(contactEmail);
+  }, [contactEmail]);
+
+  useEffect(() => {
+    if (!isValidClientEmail(contactEmail) || reminderItems.length === 0) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void captureMailingEmail({
+        email: contactEmail,
+        source: 'cart',
+        items: reminderItems,
+        metadata: {
+          saved_design_id: savedDesign?.id ?? null,
+          item_count: reminderItems.length,
+        },
+      }).catch(() => {});
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [contactEmail, reminderItems, savedDesign?.id]);
 
   async function removeSavedDesignFromCart() {
     await router.replace('/cart', undefined, { shallow: true });
@@ -312,6 +415,19 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                   </p>
                 </div>
 
+                <label className="checkout-field">
+                  <span>{contactCopy.label}</span>
+                  <input
+                    value={contactEmail}
+                    onChange={(event) => setContactEmail(event.target.value)}
+                    placeholder={contactCopy.placeholder}
+                    className="field-input"
+                    inputMode="email"
+                    autoComplete="email"
+                  />
+                  <small className="text-xs leading-6 text-[color:var(--text-muted)]">{contactCopy.note}</small>
+                </label>
+
                 <div className="grid gap-3">
                   <Link
                     href={{
@@ -322,6 +438,7 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                           typeof router.query.prefillName === 'string' ? router.query.prefillName : undefined,
                         prefillPhone:
                           typeof router.query.prefillPhone === 'string' ? router.query.prefillPhone : undefined,
+                        prefillEmail: isValidClientEmail(contactEmail) ? normalizeClientEmail(contactEmail) : undefined,
                       },
                     }}
                     className="primary-button w-full"

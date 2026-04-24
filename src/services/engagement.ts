@@ -24,6 +24,7 @@ export type SavedDesignOrderEntry = {
   language: 'en' | 'ar';
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   dressId: string;
   dressName: string;
   originalImageUrl: string;
@@ -48,6 +49,8 @@ export type SavedDesignEntry = {
   language?: 'en' | 'ar';
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
+  email?: string | null;
 };
 
 export type AdminInsights = {
@@ -150,6 +153,7 @@ export async function submitSavedDesignOrder(input: {
   language: 'en' | 'ar';
   customerName?: string;
   customerPhone?: string;
+  customerEmail?: string;
   userId?: string | null;
   guestId?: string | null;
   dressId: string;

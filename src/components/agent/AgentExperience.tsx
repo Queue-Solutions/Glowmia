@@ -25,6 +25,13 @@ import {
   sendAgentMessage,
 } from '@/src/services/glowmiaAgent';
 import { resolveViewerIdentity, submitAgentFeedback, submitSavedDesignOrder } from '@/src/services/engagement';
+import {
+  captureMailingEmail,
+  getStoredContactEmail,
+  isValidClientEmail,
+  normalizeClientEmail,
+  setStoredContactEmail,
+} from '@/src/services/mailing';
 
 type AgentMode = 'recommend' | 'edit';
 
@@ -148,13 +155,15 @@ const copyByLanguage = {
     saveDesignDescription: 'Save the final look to admin orders so the team can contact you.',
     saveDesignNameLabel: 'Name',
     saveDesignPhoneLabel: 'Phone number',
+    saveDesignEmailLabel: 'Email address',
     saveDesignNamePlaceholder: 'Your name',
     saveDesignPhonePlaceholder: 'Your phone number',
+    saveDesignEmailPlaceholder: 'name@example.com',
     saveDesignSubmit: 'Save to orders',
     savingDesign: 'Saving...',
     saveDesignSuccess: 'Saved to admin orders.',
     saveDesignError: 'Unable to save this design right now.',
-    saveDesignRequired: 'Add your name and phone number first.',
+    saveDesignRequired: 'Add your name, phone number, and email first.',
     dontSaveDesign: "Don't save",
   },
   ar: {
@@ -229,13 +238,15 @@ const copyByLanguage = {
     saveDesignDescription: 'احفظي الإطلالة النهائية في الطلبات ليتمكن الفريق من التواصل معك.',
     saveDesignNameLabel: 'الاسم',
     saveDesignPhoneLabel: 'رقم الهاتف',
+    saveDesignEmailLabel: 'البريد الإلكتروني',
     saveDesignNamePlaceholder: 'اسمك',
     saveDesignPhonePlaceholder: 'رقم هاتفك',
+    saveDesignEmailPlaceholder: 'name@example.com',
     saveDesignSubmit: 'حفظ في الطلبات',
     savingDesign: 'جارٍ الحفظ...',
     saveDesignSuccess: 'تم الحفظ في الطلبات.',
     saveDesignError: 'تعذر حفظ هذا التصميم الآن.',
-    saveDesignRequired: 'أضيفي الاسم ورقم الهاتف أولًا.',
+    saveDesignRequired: 'أضيفي الاسم ورقم الهاتف والبريد الإلكتروني أولًا.',
     dontSaveDesign: 'عدم الحفظ',
   },
 } as const;
@@ -440,6 +451,7 @@ export function AgentExperience() {
   const [saveTargetMessageId, setSaveTargetMessageId] = useState<string | null>(null);
   const [saveCustomerName, setSaveCustomerName] = useState('');
   const [saveCustomerPhone, setSaveCustomerPhone] = useState('');
+  const [saveCustomerEmail, setSaveCustomerEmail] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState('');
   const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
@@ -543,6 +555,50 @@ export function AgentExperience() {
 
   useEffect(() => () => clearFeedbackTimer(), []);
 
+  useEffect(() => {
+    const storedEmail = getStoredContactEmail();
+
+    if (!storedEmail) {
+      return;
+    }
+
+    setSaveCustomerEmail((current) => current || storedEmail);
+  }, []);
+
+  useEffect(() => {
+    setStoredContactEmail(saveCustomerEmail);
+  }, [saveCustomerEmail]);
+
+  useEffect(() => {
+    if (!saveTargetMessageId || !isValidClientEmail(saveCustomerEmail)) {
+      return;
+    }
+
+    const targetMessage = messages.find(
+      (message): message is AgentEditMessage => message.id === saveTargetMessageId && message.type === 'edit',
+    );
+
+    if (!targetMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void captureMailingEmail({
+        email: saveCustomerEmail,
+        source: 'agent',
+        metadata: {
+          session_id: sessionId,
+          dress_id: targetMessage.data.dress_id,
+          dress_name: targetMessage.data.dressName,
+        },
+      }).catch(() => {});
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [messages, saveCustomerEmail, saveTargetMessageId, sessionId]);
+
   async function initializeSession() {
     setBootstrapping(true);
     setError('');
@@ -559,6 +615,7 @@ export function AgentExperience() {
     setSaveTargetMessageId(null);
     setSaveCustomerName('');
     setSaveCustomerPhone('');
+    setSaveCustomerEmail(getStoredContactEmail());
     setSaveState('idle');
     setSaveError('');
     setSavedMessageIds([]);
@@ -793,17 +850,26 @@ export function AgentExperience() {
   async function handleSaveDesign(message: AgentEditMessage) {
     const customerName = saveCustomerName.trim();
     const customerPhone = saveCustomerPhone.trim();
+    const customerEmail = normalizeClientEmail(saveCustomerEmail);
+
+    if (!customerName || !customerPhone || !customerEmail || !isValidClientEmail(customerEmail)) {
+      setSaveState('error');
+      setSaveError(copy.saveDesignRequired);
+      return;
+    }
 
     setSaveState('saving');
     setSaveError('');
 
     try {
+      setStoredContactEmail(customerEmail);
       const identity = await resolveViewerIdentity();
       const savedDesign = await submitSavedDesignOrder({
         sessionId,
         language,
         customerName,
         customerPhone,
+        customerEmail,
         userId: identity.userId,
         guestId: identity.guestId,
         dressId: message.data.dress_id,
@@ -822,6 +888,7 @@ export function AgentExperience() {
           savedDesignId: savedDesign.id,
           prefillName: customerName || undefined,
           prefillPhone: customerPhone || undefined,
+          prefillEmail: customerEmail || undefined,
         },
       });
     } catch (saveError) {
@@ -1257,6 +1324,22 @@ export function AgentExperience() {
                                         placeholder={copy.saveDesignPhonePlaceholder}
                                         className="field-input"
                                         inputMode="tel"
+                                      />
+                                    </label>
+
+                                    <label className="agent-save-panel__field">
+                                      <span>{copy.saveDesignEmailLabel}</span>
+                                      <input
+                                        value={saveCustomerEmail}
+                                        onChange={(event) => {
+                                          setSaveCustomerEmail(event.target.value);
+                                          setSaveState('idle');
+                                          setSaveError('');
+                                        }}
+                                        placeholder={copy.saveDesignEmailPlaceholder}
+                                        className="field-input"
+                                        inputMode="email"
+                                        autoComplete="email"
                                       />
                                     </label>
                                   </div>

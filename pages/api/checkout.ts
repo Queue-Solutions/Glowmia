@@ -1,6 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { createCheckoutOrders, getSavedDesignById, markSavedDesignOrdered, type CheckoutOrderRecord } from '@/src/lib/glowmiaOrders';
+import {
+  clearAbandonedCart,
+  isValidNewsletterEmail,
+  normalizeNewsletterEmail,
+  sendOrderConfirmationEmail,
+  trackEmailEvent,
+  upsertNewsletterSubscriber,
+} from '@/src/lib/newsletter';
 
 type CheckoutItemInput = {
   designId?: unknown;
@@ -12,6 +20,7 @@ type CheckoutRequestBody = {
   customer?: {
     name?: unknown;
     phone?: unknown;
+    email?: unknown;
     address?: unknown;
     city?: unknown;
   };
@@ -71,6 +80,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
   const customer = {
     name: readTrimmedString(body.customer?.name),
     phone: readTrimmedString(body.customer?.phone),
+    email: normalizeNewsletterEmail(body.customer?.email),
     address: readTrimmedString(body.customer?.address),
     city: readTrimmedString(body.customer?.city),
   };
@@ -80,8 +90,13 @@ export default async function handler(request: NextApiRequest, response: NextApi
   const savedDesignId = readTrimmedString(body.savedDesignId, 200);
   const itemInputs = readCheckoutItems(body.items);
 
-  if (!customer.name || !customer.phone || !customer.address || !customer.city) {
-    response.status(400).json({ error: 'Name, phone, address, and city are required.' });
+  if (!customer.name || !customer.phone || !customer.email || !customer.address || !customer.city) {
+    response.status(400).json({ error: 'Name, phone, email, address, and city are required.' });
+    return;
+  }
+
+  if (!isValidNewsletterEmail(customer.email)) {
+    response.status(400).json({ error: 'A valid email address is required.' });
     return;
   }
 
@@ -169,6 +184,41 @@ export default async function handler(request: NextApiRequest, response: NextApi
     if (savedDesign?.id && orderReference) {
       await markSavedDesignOrdered(savedDesign.id, orderReference);
     }
+
+    await upsertNewsletterSubscriber({
+      email: customer.email,
+      source: 'order',
+      metadata: {
+        order_id: orderReference,
+        customer_name: customer.name,
+        item_count: items.length,
+      },
+    });
+
+    await trackEmailEvent({
+      email: customer.email,
+      eventType: 'order_created',
+      metadata: {
+        order_id: orderReference,
+        customer_name: customer.name,
+        items,
+      },
+    });
+
+    await sendOrderConfirmationEmail({
+      email: customer.email,
+      customerName: customer.name,
+      orderId: orderReference,
+      items: items.map((item) => ({
+        designId: item.designId,
+        designName: item.designName,
+        imageUrl: item.imageUrl,
+        quantity: item.quantity,
+        size: item.size,
+      })),
+    });
+
+    await clearAbandonedCart(customer.email);
 
     response.status(201).json({
       ok: true,
