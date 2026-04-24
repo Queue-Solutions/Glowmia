@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { randomUUID } from 'crypto';
 import { saveAgentDesign } from '@/src/lib/glowmiaOrders';
+import { persistRemoteImageToSupabaseStorage } from '@/src/lib/imageStorage';
 import {
   isValidNewsletterEmail,
   normalizeNewsletterEmail,
@@ -75,13 +76,37 @@ export default async function handler(request: NextApiRequest, response: NextApi
   }
 
   try {
+    // Persist the temporary Replicate image URL to permanent Supabase Storage
+    console.log('[api/engagement/agent-design-order] Persisting edited image to Supabase Storage...');
+    let persistedImageUrl: string;
+    try {
+      persistedImageUrl = await persistRemoteImageToSupabaseStorage(editedImageUrl);
+      console.log('[api/engagement/agent-design-order] Successfully persisted image:', { persistedImageUrl });
+    } catch (imageError) {
+      const imageErrorMessage =
+        imageError instanceof Error
+          ? imageError.message
+          : 'Unknown error occurred while persisting image';
+      console.error('[api/engagement/agent-design-order] Failed to persist image to Supabase Storage.', {
+        error: imageErrorMessage,
+        editedImageUrl,
+        dressId,
+        dressName,
+      });
+      response.status(500).json({
+        error: `Failed to save design image. ${imageErrorMessage}. Please try again.`,
+      });
+      return;
+    }
+
+    // Save design with the persisted image URL (not the temporary Replicate URL)
     const savedDesign = await saveAgentDesign({
       userId: normalizedUserId || null,
       guestId: normalizedUserId ? null : normalizedGuestId || randomUUID(),
       dressId,
       email: customerEmail,
       originalImageUrl,
-      editedImageUrl,
+      editedImageUrl: persistedImageUrl,
       prompt,
       designName: dressName,
       notes: {
@@ -94,6 +119,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
       isOrdered: false,
     });
 
+    // Use the persisted URL for newsletter and tracking
     await upsertNewsletterSubscriber({
       email: customerEmail,
       source: 'designer_request',
@@ -101,7 +127,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
         design_id: savedDesign.id,
         dress_id: dressId,
         dress_name: dressName,
-        image_url: editedImageUrl,
+        image_url: persistedImageUrl,
         edit_prompt: prompt || null,
         created_at: savedDesign.createdAt,
       },
@@ -114,7 +140,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
         design_id: savedDesign.id,
         dress_id: dressId,
         dress_name: dressName,
-        image_url: editedImageUrl,
+        image_url: persistedImageUrl,
         edit_prompt: prompt || null,
         created_at: savedDesign.createdAt,
       },
@@ -127,7 +153,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
         design_id: savedDesign.id,
         dress_id: dressId,
         dress_name: dressName,
-        image_url: editedImageUrl,
+        image_url: persistedImageUrl,
         edit_prompt: prompt || null,
         created_at: savedDesign.createdAt,
       },
@@ -143,10 +169,11 @@ export default async function handler(request: NextApiRequest, response: NextApi
       },
     });
 
+    // Send confirmation email with the persisted image URL
     await sendDesignConfirmationEmail({
       email: customerEmail,
       dressName: dressName,
-      imageUrl: editedImageUrl,
+      imageUrl: persistedImageUrl,
       prompt: prompt || null,
     });
 

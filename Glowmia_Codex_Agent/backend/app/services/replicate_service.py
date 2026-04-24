@@ -62,6 +62,8 @@ class ReplicateService:
         return str(output).strip()
 
     async def edit_image(self, image_url: str, instruction: str, language: str = "en") -> str:
+        logger.debug(f"[EDIT_DEBUG] Original user request: language={language}, instruction={instruction!r}")
+        
         effective_instruction = instruction
         effective_language = language
         if language == "ar":
@@ -75,12 +77,16 @@ class ReplicateService:
             if translated_instruction.strip():
                 effective_instruction = translated_instruction.strip()
                 effective_language = "en"
+                logger.debug(f"[EDIT_DEBUG] Translated from Arabic: {translated_instruction!r}")
 
         model_identifier = settings.replicate_model
+        final_prompt = build_edit_prompt(effective_language, effective_instruction)
+        logger.debug(f"[EDIT_DEBUG] Final normalized prompt: {final_prompt!r}")
+        
         payload: dict[str, Any] = {
             "input": {
                 "input_image": image_url,
-                "prompt": build_edit_prompt(effective_language, effective_instruction),
+                "prompt": final_prompt,
                 "aspect_ratio": "match_input_image",
                 "output_format": "png",
                 "prompt_upsampling": False,
@@ -89,6 +95,8 @@ class ReplicateService:
         }
         if ":" in model_identifier:
             payload["version"] = model_identifier
+        
+        logger.debug(f"[EDIT_DEBUG] Replicate API payload (input only): {payload.get('input')}")
         data = await self._create_prediction(model_identifier, payload)
         output = data.get("output")
         if isinstance(output, list) and output:
