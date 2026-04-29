@@ -691,7 +691,8 @@ export function AgentExperience() {
 
   async function handleSend(overrideInput?: string) {
     const trimmed = (overrideInput ?? input).trim();
-    const shouldRouteToEdit = Boolean(selectedDress && isLikelyEditInstruction(trimmed, language));
+    const selectedDressImageUrl = selectedDress ? getEditingImageUrl(selectedDress) : '';
+    const shouldRouteToEdit = Boolean(selectedDress?.id && selectedDressImageUrl && isLikelyEditInstruction(trimmed, language));
 
     if (!trimmed || !sessionId || loading) {
       return;
@@ -718,7 +719,7 @@ export function AgentExperience() {
         message: trimmed,
         language,
         selectedDressId: selectedDress?.id ?? null,
-        selectedDressImageUrl: selectedDress ? getEditingImageUrl(selectedDress) : null,
+        selectedDressImageUrl: selectedDressImageUrl || null,
         modeHint: shouldRouteToEdit ? 'edit' : null,
       });
 

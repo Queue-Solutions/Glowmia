@@ -87,9 +87,13 @@ export async function sendAgentMessage(payload: {
   selectedDressImageUrl?: string | null;
   modeHint?: AgentModeHint | null;
 }) {
-  const path = payload.modeHint === 'edit' ? 'edit' : 'message';
+  const shouldUseEditRoute = Boolean(
+    payload.modeHint === 'edit' &&
+      payload.selectedDressId &&
+      payload.selectedDressImageUrl,
+  );
 
-  return postJson<AgentChatResponse>(path, {
+  return postJson<AgentChatResponse>(shouldUseEditRoute ? 'edit' : 'message', {
     sessionId: payload.sessionId,
     message: payload.message,
     language: payload.language,

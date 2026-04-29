@@ -84,9 +84,9 @@ export function SiteFooter() {
               </a>
             ))}
           </div>
-          <a href="mailto:glowmia.sa@hotmail.com" className="site-footer__contact">
+          {/* <a href="mailto:glowmia.sa@hotmail.com" className="site-footer__contact">
             glowmia.sa@hotmail.com
-          </a>
+          </a> */}
           <p className="site-footer__copyright">{copyFor(language, glowmiaCopy.footer.copyright)}</p>
           <Link
             href="https://queuesolutions.org/"

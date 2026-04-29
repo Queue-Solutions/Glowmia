@@ -5,19 +5,24 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 
 export function AgentTeaser() {
   const { language } = useSitePreferencesContext();
+
   const featureItems =
     language === 'ar'
-      ? ['ØªÙˆØµÙŠØ§Øª Ù…Ø®ØµØµØ©', 'Ù…Ù‚Ø§Ø±Ù†Ø§Øª Ø³Ø±ÙŠØ¹Ø©', 'ØªØ¹Ø¯ÙŠÙ„ Ù„Ù„ØªØµÙ…ÙŠÙ…']
+      ? ['توصيات مخصصة', 'مقارنات سريعة', 'تعديل للتصميم']
       : ['Personalized picks', 'Fast comparisons', 'Design refinements'];
 
   return (
     <section className="mx-auto w-full max-w-7xl px-6 py-10 md:px-10 md:py-14">
       <div className="grid gap-6 rounded-[2rem] border border-[color:var(--line)] bg-[linear-gradient(135deg,var(--surface-elevated),var(--accent-soft))] px-5 py-6 shadow-[var(--shadow-soft)] sm:px-6 sm:py-8 md:grid-cols-[1.05fr_0.95fr] md:items-center md:px-8">
         <div className="space-y-4">
-          <span className="eyebrow-chip">{copyFor(language, glowmiaCopy.home.agentEyebrow)}</span>
+          <span className="eyebrow-chip">
+            {copyFor(language, glowmiaCopy.home.agentEyebrow)}
+          </span>
+
           <h2 className="font-display text-3xl text-[color:var(--text-primary)] sm:text-4xl md:text-5xl">
             {copyFor(language, glowmiaCopy.home.agentTitle)}
           </h2>
+
           <p className="max-w-2xl text-base leading-7 text-[color:var(--text-muted)] sm:text-lg sm:leading-8">
             {copyFor(language, glowmiaCopy.home.agentDescription)}
           </p>
@@ -27,8 +32,9 @@ export function AgentTeaser() {
               {copyFor(language, glowmiaCopy.home.agentCta)}
               <ArrowRight className="h-4 w-4" />
             </Link>
+
             <Link href="/designs" className="secondary-button w-full justify-center sm:w-auto">
-              {language === 'ar' ? 'ØªØµÙØ­ÙŠ Ø§Ù„ØªØµØ§Ù…ÙŠÙ… Ø£ÙˆÙ„Ù‹Ø§' : 'Browse designs first'}
+              {language === 'ar' ? 'تصفحي التصاميم أولًا' : 'Browse designs first'}
             </Link>
           </div>
         </div>
@@ -38,11 +44,15 @@ export function AgentTeaser() {
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--text-primary)]">
               <Bot className="h-5 w-5" />
             </div>
+
             <div className="space-y-2">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Glowmia Stylist</p>
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
+                Glowmia Stylist
+              </p>
+
               <p className="text-sm leading-7 text-[color:var(--text-muted)]">
                 {language === 'ar'
-                  ? 'Ø§Ø·Ù„Ø¨ÙŠ Ù„ÙˆÙƒØ§Øª Ù…Ù†Ø§Ø³Ø¨Ø©ØŒ Ù‚Ø§Ø±Ù†ÙŠ Ø¨ÙŠÙ† Ø§Ù„Ù…ÙˆØ¯Ø²ØŒ ÙˆØ§Ø­ÙØ¸ÙŠ Ø§Ù„ØªØµÙ…ÙŠÙ… Ø§Ù„Ù…Ø¹Ø¯Ù„ Ø¨Ø®Ø·ÙˆØ§Øª ÙˆØ§Ø¶Ø­Ø©.'
+                  ? 'اطلبي لوكات مناسبة، قارني بين الموديلات، واحفظي التصميم المعدل بخطوات واضحة.'
                   : 'Ask for matched looks, compare moods, and save a refined version of any design in a few steps.'}
               </p>
             </div>
@@ -53,7 +63,10 @@ export function AgentTeaser() {
               const Icon = index === 0 ? Sparkles : index === 1 ? ArrowRight : Wand2;
 
               return (
-                <div key={item} className="flex items-center gap-2 rounded-[1.1rem] border border-[color:var(--line)] bg-[color:var(--surface)] px-3 py-3 text-sm text-[color:var(--text-primary)]">
+                <div
+                  key={item}
+                  className="flex items-center gap-2 rounded-[1.1rem] border border-[color:var(--line)] bg-[color:var(--surface)] px-3 py-3 text-sm text-[color:var(--text-primary)]"
+                >
                   <Icon className="h-4 w-4 shrink-0 text-[color:var(--accent)]" />
                   <span>{item}</span>
                 </div>

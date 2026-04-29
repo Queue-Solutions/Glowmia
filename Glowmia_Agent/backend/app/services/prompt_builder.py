@@ -45,14 +45,21 @@ def build_system_prompt(language: Language) -> str:
 def build_style_prompt(language: Language, user_message: str) -> str:
     if language == "ar":
         return (
-            "Provide practical, refined styling advice for the following user request. "
-            "Reply entirely in natural Arabic script, with clear suggestions for accessories, shoes, layering, colors, or finishing touches when relevant. "
+            "Provide direct, specific styling advice for the following user request. "
+            "Always answer the user's exact question first, then optionally add extra suggestions. "
+            "Reply entirely in natural Arabic script with concrete recommendations such as colors, combinations, accessories, shoes, layering, or finishing touches when relevant. "
+            "Avoid generic phrases like يمكنني مساعدتك or broad filler. "
+            "Do not ask unnecessary follow-up questions. "
+            "If the user asks about shoe colors for a black dress, give specific options such as: ذهبي أو فضي للسهرات، نود أو بيج لإطلالة ناعمة، أسود للوك كلاسيكي، أحمر غامق أو عنابي لإطلالة جريئة، وأبيض أو شامبين حسب المناسبة. "
             "Do not insert foreign-script words unless they are unavoidable brand names.\n"
             f"User request: {user_message}"
         )
 
     return (
-        "Give practical, fashion-aware styling advice for the user's request with a natural, polished tone:\n"
+        "Give direct, specific, fashion-aware styling advice for the user's request. "
+        "Always answer the user's exact question first, then optionally add extra suggestions. "
+        "Provide concrete recommendations such as colors, pairings, accessories, shoes, layering, or finishing touches when relevant. "
+        "Avoid generic filler and unnecessary follow-up questions.\n"
         f"{user_message}"
     )
 
@@ -100,6 +107,15 @@ def build_intent_prompt(language: Language, user_message: str, has_selected_dres
             "styling = asking for advice on how to style or accessorize a dress without changing the image itself.\n"
             "edit = asking to visually modify the selected dress image itself, including adding or changing visible items or details.\n"
             "chat = general conversation or questions that are not recommendation, styling, or edit requests.\n"
+            "Egyptian Arabic recommendation examples:\n"
+            "- \u0623\u0631\u064a\u062f \u0641\u0633\u062a\u0627\u0646\u064b\u0627 \u0623\u0633\u0648\u062f = recommend\n"
+            "- \u0639\u0627\u064a\u0632 \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend\n"
+            "- \u0639\u0627\u064a\u0632\u0647 \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend\n"
+            "- \u0639\u0627\u0648\u0632 \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend\n"
+            "- \u0647\u0627\u062a\u0644\u064a \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend\n"
+            "- \u0648\u0631\u064a\u0646\u064a \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend\n"
+            "- \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend\n"
+            "- \u0644\u0648 \u0639\u0646\u062f\u064a \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f \u0627\u064a\u0647 \u0627\u0643\u062a\u0631 \u0644\u0648\u0646 \u062c\u0632\u0645\u0647 \u064a\u0644\u064a\u0642 \u0639\u0644\u064a\u0647 = styling\n"
             f"{selected_dress_note}"
             f"User message: {user_message}"
         )

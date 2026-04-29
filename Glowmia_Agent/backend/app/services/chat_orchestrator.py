@@ -6,6 +6,7 @@ from app.services.intent_router import IntentRouter
 from app.services.prompt_builder import build_chat_prompt, build_history, build_selected_dress_context, build_style_prompt, build_system_prompt
 from app.services.recommendation_service import RecommendationService
 from app.services.replicate_service import ReplicateService
+from app.core.logging import get_logger
 
 
 ARABIC_COLOR_LABELS = {
@@ -21,6 +22,8 @@ ARABIC_COLOR_LABELS = {
     "cream": "أوف وايت",
     "blush": "وردي فاتح",
 }
+
+logger = get_logger(__name__)
 
 
 class ChatOrchestrator:
@@ -145,10 +148,11 @@ class ChatOrchestrator:
         if payload.selected_dress_image_url:
             self.session_store.set_current_image(session.id, payload.selected_dress_image_url)
 
+        has_editable_selection = bool(payload.selected_dress_id and (payload.selected_dress_image_url or session.current_image_url))
         intent = await self.intent_router.detect_intent(
             payload.message,
             language,
-            has_selected_dress=bool(payload.selected_dress_id or session.selected_dress_id),
+            has_selected_dress=has_editable_selection,
         )
         parsed_data = self.recommendation_service.analyze_preferences(payload.message) if intent == "recommend" else None
 
@@ -178,6 +182,7 @@ class ChatOrchestrator:
                 if direct_answer:
                     return self._response_base(session, "llm", "chat", language, direct_answer)
             if intent == "recommend":
+                logger.info("Recommendation retrieval called | session_id=%s | message=%s", session.id, payload.message)
                 return self._handle_recommendation(session, payload.message, language)
             if intent == "styling":
                 return await self._handle_styling(session, payload.message, language)

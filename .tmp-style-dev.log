@@ -1,0 +1,112 @@
+
+> fashion-portfolio@0.1.0 dev
+> next dev -p 3001 -p 3014
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3014
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2s
+ ✓ Compiled /api/agent/session in 183ms (87 modules)
+[agent.local] Created session with local Vercel handler. { language: 'ar', source: 'vercel' }
+[api/agent/session] Responded via vercel with status 201.
+ POST /api/agent/session 201 in 928ms
+ ✓ Compiled /api/agent/message in 34ms (89 modules)
+[agent.local] Intent selected by local rule {
+  normalizedMessage: 'لو عندي فستان اسود ايه اكتر لون جزمه يليق عليه؟',
+  ruleIntent: 'styling',
+  llmIntent: null,
+  finalIntent: 'styling'
+}
+[agent.local] Detected intent for local handler. {
+  hasExplicitEditableSelection: false,
+  intent: 'styling',
+  modeHint: null
+}
+[agent.local] Responded with local Vercel agent handler. { forceEdit: false, source: 'vercel' }
+[api/agent/message] Responded via vercel with status 200.
+ POST /api/agent/message 200 in 1442ms
+ ✓ Compiled in 197ms (89 modules)
+[agent.local] Created session with local Vercel handler. { language: 'ar', source: 'vercel' }
+[api/agent/session] Responded via vercel with status 201.
+ POST /api/agent/session 201 in 338ms
+[agent.local] Intent selected by local rule {
+  normalizedMessage: 'لو عندي فستان اسود ايه اكتر لون جزمه يليق عليه؟',
+  ruleIntent: 'styling',
+  llmIntent: null,
+  finalIntent: 'styling'
+}
+[agent.local] Detected intent for local handler. {
+  hasExplicitEditableSelection: false,
+  intent: 'styling',
+  modeHint: null
+}
+[agent.local] Responded with local Vercel agent handler. { forceEdit: false, source: 'vercel' }
+[api/agent/message] Responded via vercel with status 200.
+ POST /api/agent/message 200 in 1256ms
+ ✓ Compiled in 106ms (63 modules)
+ ✓ Compiled /api/agent/session in 84ms (87 modules)
+[agent.local] Created session with local Vercel handler. { language: 'ar', source: 'vercel' }
+[api/agent/session] Responded via vercel with status 201.
+ POST /api/agent/session 201 in 422ms
+ ✓ Compiled /api/agent/message in 25ms (89 modules)
+[agent.local] Intent selected by local rule {
+  normalizedMessage: 'لو عندي فستان اسود ايه اكتر لون جزمه يليق عليه؟',
+  ruleIntent: 'styling',
+  llmIntent: null,
+  finalIntent: 'styling'
+}
+[agent.local] Detected intent for local handler. {
+  hasExplicitEditableSelection: false,
+  intent: 'styling',
+  modeHint: null
+}
+[agent.local] Styling reply path. {
+  hasReplicateTextModel: false,
+  isBlackDressShoeStylingQuestion: false
+}
+[agent.local] Responded with local Vercel agent handler. { forceEdit: false, source: 'vercel' }
+[api/agent/message] Responded via vercel with status 200.
+ POST /api/agent/message 200 in 1148ms
+ ✓ Compiled in 147ms (89 modules)
+[agent.local] Created session with local Vercel handler. { language: 'ar', source: 'vercel' }
+[api/agent/session] Responded via vercel with status 201.
+ POST /api/agent/session 201 in 408ms
+[agent.local] Intent selected by local rule {
+  normalizedMessage: 'لو عندي فستان اسود ايه اكتر لون جزمه يليق عليه؟',
+  ruleIntent: 'styling',
+  llmIntent: null,
+  finalIntent: 'styling'
+}
+[agent.local] Detected intent for local handler. {
+  hasExplicitEditableSelection: false,
+  intent: 'styling',
+  modeHint: null
+}
+[agent.local] Styling reply path. {
+  hasReplicateTextModel: false,
+  isBlackDressShoeStylingQuestion: false
+}
+[agent.local] Responded with local Vercel agent handler. { forceEdit: false, source: 'vercel' }
+[api/agent/message] Responded via vercel with status 200.
+ POST /api/agent/message 200 in 1159ms
+ ✓ Compiled in 100ms (89 modules)
+[agent.local] Created session with local Vercel handler. { language: 'ar', source: 'vercel' }
+[api/agent/session] Responded via vercel with status 201.
+ POST /api/agent/session 201 in 457ms
+[agent.local] Intent selected by local rule {
+  normalizedMessage: 'لو عندي فستان اسود ايه اكتر لون جزمه يليق عليه؟',
+  ruleIntent: 'styling',
+  llmIntent: null,
+  finalIntent: 'styling'
+}
+[agent.local] Detected intent for local handler. {
+  hasExplicitEditableSelection: false,
+  intent: 'styling',
+  modeHint: null
+}
+[agent.local] Styling reply path. { hasReplicateTextModel: false, isBlackDressShoeStylingQuestion: true }
+[agent.local] Responded with local Vercel agent handler. { forceEdit: false, source: 'vercel' }
+[api/agent/message] Responded via vercel with status 200.
+ POST /api/agent/message 200 in 1774ms

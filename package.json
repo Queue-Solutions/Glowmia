@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "admin:secrets": "node scripts/admin-secrets.mjs"
+    "admin:secrets": "node scripts/admin-secrets.mjs",
+    "agent:reset": "powershell -ExecutionPolicy Bypass -File scripts/reset-agent-runtime.ps1",
+    "agent:reset:restart": "powershell -ExecutionPolicy Bypass -File scripts/reset-agent-runtime.ps1 -Restart"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

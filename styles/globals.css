@@ -36,6 +36,13 @@ body {
   transition: background-color 180ms ease, color 180ms ease;
 }
 
+/* Arabic text support */
+:lang(ar),
+[lang="ar"],
+.arabic {
+  font-family: 'El Messiri', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
 img {
   display: block;
   max-width: 100%;

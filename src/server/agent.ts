@@ -103,6 +103,23 @@ const DRESSES_TABLE = 'dresses';
 const MAX_AGENT_DRESSES = 4;
 const MAX_SESSION_MESSAGES = 50;
 
+function isDevelopmentRuntime() {
+  return process.env.NODE_ENV !== 'production';
+}
+
+function logAgentDev(message: string, details?: Record<string, unknown>) {
+  if (!isDevelopmentRuntime()) {
+    return;
+  }
+
+  if (details) {
+    console.info(`[agent.local] ${message}`, details);
+    return;
+  }
+
+  console.info(`[agent.local] ${message}`);
+}
+
 function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -110,6 +127,21 @@ function readString(value: unknown) {
 function readNullableString(value: unknown) {
   const normalized = readString(value);
   return normalized || null;
+}
+
+function normalizeIntentMessage(message: string) {
+  return message
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\u064b-\u065f\u0670\u06d6-\u06ed]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/[^\w\s\u0600-\u06ff]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizeList(value: unknown) {
@@ -450,7 +482,7 @@ async function getDressRowById(dressId: string) {
 }
 
 function isLikelyEditInstruction(message: string) {
-  const normalized = message.toLowerCase();
+  const normalized = normalizeIntentMessage(message);
   return [
     'edit',
     'modify',
@@ -475,26 +507,73 @@ function isLikelyEditInstruction(message: string) {
   ].some((token) => normalized.includes(token));
 }
 
+function containsIntentTerm(normalizedMessage: string, terms: readonly string[]) {
+  return terms.some((term) => normalizedMessage.includes(term));
+}
+
+function hasDressToken(normalizedMessage: string) {
+  const tokens = normalizedMessage.split(' ');
+  return tokens.some((token) => token === '\u0641\u0633\u062a\u0627\u0646' || token.startsWith('\u0641\u0633\u062a\u0627\u0646'));
+}
+
+function looksLikeCatalogRequest(normalizedMessage: string) {
+  if (!hasDressToken(normalizedMessage)) {
+    return false;
+  }
+
+  const requestTerms = [
+    'recommend',
+    'show me',
+    'suggest',
+    'looking for',
+    'i need',
+    '\u0627\u0631\u064a\u062f',
+    '\u0627\u0628\u063a\u0649',
+    '\u0627\u0628\u063a\u064a',
+    '\u0639\u0627\u064a\u0632',
+    '\u0639\u0627\u064a\u0632\u0647',
+    '\u0639\u0627\u0648\u0632',
+    '\u0639\u0627\u0648\u0632\u0647',
+    '\u0647\u0627\u062a\u0644\u064a',
+    '\u0648\u0631\u064a\u0646\u064a',
+    '\u0645\u062d\u062a\u0627\u062c',
+  ] as const;
+
+  if (containsIntentTerm(normalizedMessage, requestTerms)) {
+    return true;
+  }
+
+  return normalizedMessage.split(' ').filter(Boolean).length <= 3;
+}
+
 function isLikelyRecommendationRequest(message: string) {
-  const normalized = message.toLowerCase();
-  return [
+  const normalized = normalizeIntentMessage(message);
+  const explicitTerms = [
     'recommend',
     'show me',
     'looking for',
     'i need a dress',
     'suggest',
     'dress for',
-    'اعرضي',
-    'اقترحي',
-    'أريد فستان',
-    'اريد فستان',
-    'أبغى فستان',
-    'ابغى فستان',
-  ].some((token) => normalized.includes(token));
+    '\u0627\u0639\u0631\u0636\u064a',
+    '\u0627\u0642\u062a\u0631\u062d\u064a',
+    '\u0627\u0631\u064a\u062f \u0641\u0633\u062a\u0627\u0646',
+    '\u0627\u0628\u063a\u0649 \u0641\u0633\u062a\u0627\u0646',
+    '\u0627\u0628\u063a\u064a \u0641\u0633\u062a\u0627\u0646',
+    '\u0639\u0627\u064a\u0632 \u0641\u0633\u062a\u0627\u0646',
+    '\u0639\u0627\u064a\u0632\u0647 \u0641\u0633\u062a\u0627\u0646',
+    '\u0639\u0627\u0648\u0632 \u0641\u0633\u062a\u0627\u0646',
+    '\u0639\u0627\u0648\u0632\u0647 \u0641\u0633\u062a\u0627\u0646',
+    '\u0647\u0627\u062a\u0644\u064a \u0641\u0633\u062a\u0627\u0646',
+    '\u0648\u0631\u064a\u0646\u064a \u0641\u0633\u062a\u0627\u0646',
+    '\u0645\u062d\u062a\u0627\u062c \u0641\u0633\u062a\u0627\u0646',
+  ] as const;
+
+  return containsIntentTerm(normalized, explicitTerms) || looksLikeCatalogRequest(normalized);
 }
 
 function isLikelyStylingRequest(message: string) {
-  const normalized = message.toLowerCase();
+  const normalized = normalizeIntentMessage(message);
   return [
     'style this',
     'how should i style',
@@ -513,36 +592,130 @@ function isLikelyStylingRequest(message: string) {
   ].some((token) => normalized.includes(token));
 }
 
+function isLikelyStylingRequestEnhanced(message: string) {
+  const normalized = normalizeIntentMessage(message);
+
+  if (isLikelyStylingRequest(message)) {
+    return true;
+  }
+
+  return [
+    'what color shoes',
+    'which shoes',
+    'what shoes',
+    'heels',
+    'pair with',
+    'match with',
+    '\u064a\u0644\u064a\u0642',
+    '\u064a\u0646\u0627\u0633\u0628',
+    '\u064a\u0644\u0628\u0642',
+    '\u062c\u0632\u0645\u0629',
+    '\u062d\u0630\u0627\u0621',
+    '\u0643\u0639\u0628',
+    '\u062d\u0642\u064a\u0628\u0629',
+    '\u064a\u0646\u0641\u0639 \u0645\u0639',
+  ].some((token) => normalized.includes(token));
+}
+
+function isShoeStylingQuestion(message: string) {
+  const normalized = normalizeIntentMessage(message);
+  return [
+    'shoe',
+    'shoes',
+    'heels',
+    '\u062c\u0632\u0645\u0629',
+    '\u062d\u0630\u0627\u0621',
+    '\u0643\u0639\u0628',
+  ].some((token) => normalized.includes(token));
+}
+
+function hasBlackDressContext(message: string) {
+  const normalized = normalizeIntentMessage(message);
+  const color = extractFilters(message).color;
+  const hasDressToken =
+    message.includes('\u0641\u0633\u062a\u0627\u0646') ||
+    normalized.includes('\u0641\u0633\u062a\u0627\u0646');
+  const hasBlackToken =
+    message.includes('\u0623\u0633\u0648\u062f') ||
+    message.includes('\u0627\u0633\u0648\u062f') ||
+    normalized.includes('\u0627\u0633\u0648\u062f');
+  return (
+    color === 'black' ||
+    (hasDressToken && hasBlackToken) ||
+    normalized.includes('\u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f') ||
+    normalized.includes('\u0641\u0633\u062a\u0627\u0646 \u0627\u0644\u0644\u0648\u0646 \u0627\u0644\u0627\u0633\u0648\u062f')
+  );
+}
+
+function isBlackDressShoeStylingQuestion(message: string) {
+  const hasShoeToken =
+    message.includes('\u062c\u0632\u0645\u0629') ||
+    message.includes('\u062c\u0632\u0645\u0647') ||
+    message.includes('\u062d\u0630\u0627\u0621') ||
+    message.includes('\u0643\u0639\u0628');
+  return (isShoeStylingQuestion(message) || hasShoeToken) && hasBlackDressContext(message);
+}
+
+function buildFallbackStylingReply(message: string, language: AgentLanguage) {
+  if (isBlackDressShoeStylingQuestion(message)) {
+    return language === 'ar'
+      ? '\u0645\u0639 \u0641\u0633\u062a\u0627\u0646 \u0623\u0633\u0648\u062f\u060c \u0623\u0643\u062b\u0631 \u0623\u0644\u0648\u0627\u0646 \u0627\u0644\u062c\u0632\u0645\u0629 \u0627\u0644\u062a\u064a \u062a\u0644\u064a\u0642 \u0639\u0644\u064a\u0647 \u0647\u064a \u0627\u0644\u0630\u0647\u0628\u064a \u0623\u0648 \u0627\u0644\u0641\u0636\u064a \u0644\u0644\u0633\u0647\u0631\u0627\u062a\u060c \u0627\u0644\u0646\u0648\u062f \u0623\u0648 \u0627\u0644\u0628\u064a\u062c \u0644\u0625\u0637\u0644\u0627\u0644\u0629 \u0646\u0627\u0639\u0645\u0629\u060c \u0627\u0644\u0623\u0633\u0648\u062f \u0644\u0644\u0648\u0643 \u0627\u0644\u0643\u0644\u0627\u0633\u064a\u0643\u064a\u060c \u0648\u0623\u062d\u0645\u0631 \u063a\u0627\u0645\u0642 \u0623\u0648 \u0639\u0646\u0627\u0628\u064a \u0625\u0630\u0627 \u0623\u0631\u062f\u062a\u0650 \u0644\u0645\u0633\u0629 \u062c\u0631\u064a\u0626\u0629. \u0648\u0645\u0645\u0643\u0646 \u0623\u064a\u0636\u064b\u0627 \u0623\u0628\u064a\u0636 \u0623\u0648 \u0634\u0627\u0645\u0628\u064a\u0646 \u062d\u0633\u0628 \u0627\u0644\u0645\u0646\u0627\u0633\u0628\u0629.'
+      : 'With a black dress, the safest shoe colors are usually gold or silver for an evening look, nude for a softer finish, or deep red and burgundy if you want a stronger accent. I can also suggest the matching bag and accessories if you want.';
+  }
+
+  return language === 'ar'
+    ? '\u064a\u0645\u0643\u0646\u0646\u064a \u062a\u0646\u0633\u064a\u0642 \u0647\u0630\u0647 \u0627\u0644\u0625\u0637\u0644\u0627\u0644\u0629 \u0645\u0639 \u0625\u0643\u0633\u0633\u0648\u0627\u0631\u0627\u062a \u0646\u0627\u0639\u0645\u0629\u060c \u062d\u0642\u064a\u0628\u0629 \u0623\u0646\u064a\u0642\u0629\u060c \u0648\u062d\u0630\u0627\u0621 \u064a\u0643\u0645\u0644 \u0627\u0644\u0641\u0633\u062a\u0627\u0646 \u0645\u0646 \u063a\u064a\u0631 \u0645\u0628\u0627\u0644\u063a\u0629. \u0625\u0630\u0627 \u0642\u0644\u062a\u0650 \u0644\u064a \u0627\u0644\u0645\u0646\u0627\u0633\u0628\u0629 \u0648\u062f\u0631\u062c\u0629 \u0627\u0644\u0641\u0633\u062a\u0627\u0646\u060c \u0623\u0642\u062f\u0631 \u0623\u062f\u0642 \u0644\u0643 \u0627\u0644\u0623\u0644\u0648\u0627\u0646 \u0648\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644.'
+    : 'I would style this look with refined accessories, a compact bag, and shoes that complement the dress without competing with it. If you tell me the occasion and dress color, I can narrow the palette more precisely.';
+}
+
 async function detectIntent(input: {
   message: string;
   language: AgentLanguage;
   hasSelectedDress: boolean;
   modeHint?: AgentModeHint | null;
 }): Promise<AgentIntent> {
+  const normalizedMessage = normalizeIntentMessage(input.message);
+  let ruleIntent: AgentIntent | null = null;
+  let llmIntent: AgentIntent | null = null;
+
   if (input.modeHint === 'edit' && input.hasSelectedDress) {
-    return 'edit';
+    ruleIntent = 'edit';
+  } else if (input.hasSelectedDress && isLikelyEditInstruction(input.message)) {
+    ruleIntent = 'edit';
+  } else if (isLikelyStylingRequestEnhanced(input.message)) {
+    ruleIntent = 'styling';
+  } else if (isLikelyRecommendationRequest(input.message)) {
+    ruleIntent = 'recommend';
   }
 
-  if (input.hasSelectedDress && isLikelyEditInstruction(input.message)) {
-    return 'edit';
-  }
-
-  if (isLikelyRecommendationRequest(input.message) || Object.keys(extractFilters(input.message)).length > 0) {
-    return 'recommend';
-  }
-
-  if (input.hasSelectedDress && isLikelyStylingRequest(input.message)) {
-    return 'styling';
+  if (ruleIntent) {
+    logAgentDev('Intent selected by local rule', {
+      normalizedMessage,
+      ruleIntent,
+      llmIntent,
+      finalIntent: ruleIntent,
+    });
+    return ruleIntent;
   }
 
   if (hasReplicateTextModel()) {
     const prompt = input.language === 'ar'
       ? [
           'Classify the intent as exactly one of: recommend, styling, edit, chat.',
+          'Understand Egyptian Arabic and colloquial Arabic phrasing, not only formal Arabic.',
           'recommend = asking for dress suggestions or options.',
           'styling = asking how to style or accessorize a dress without changing the image.',
           'edit = asking to visually modify the selected dress image itself.',
           'chat = general conversation.',
+          'Examples:',
+          '- \u0623\u0631\u064a\u062f \u0641\u0633\u062a\u0627\u0646\u064b\u0627 \u0623\u0633\u0648\u062f = recommend',
+          '- \u0639\u0627\u064a\u0632 \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend',
+          '- \u0639\u0627\u064a\u0632\u0647 \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend',
+          '- \u0639\u0627\u0648\u0632 \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend',
+          '- \u0647\u0627\u062a\u0644\u064a \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend',
+          '- \u0648\u0631\u064a\u0646\u064a \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend',
+          '- \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f = recommend',
+          '- \u0644\u0648 \u0639\u0646\u062f\u064a \u0641\u0633\u062a\u0627\u0646 \u0627\u0633\u0648\u062f \u0627\u064a\u0647 \u0627\u0643\u062a\u0631 \u0644\u0648\u0646 \u062c\u0632\u0645\u0647 \u064a\u0644\u064a\u0642 \u0639\u0644\u064a\u0647 = styling',
           `User message: ${input.message}`,
         ].join('\n')
       : [
@@ -563,6 +736,13 @@ async function detectIntent(input: {
       const normalized = result.toLowerCase().replace(/[.\-:]/g, ' ').trim().split(/\s+/)[0]?.trim();
 
       if (normalized === 'recommend' || normalized === 'styling' || normalized === 'edit' || normalized === 'chat') {
+        llmIntent = normalized;
+        logAgentDev('Intent selected by local LLM', {
+          normalizedMessage,
+          ruleIntent,
+          llmIntent,
+          finalIntent: llmIntent,
+        });
         return normalized;
       }
     } catch (error) {
@@ -570,6 +750,12 @@ async function detectIntent(input: {
     }
   }
 
+  logAgentDev('Intent defaulted to chat', {
+    normalizedMessage,
+    ruleIntent,
+    llmIntent,
+    finalIntent: 'chat',
+  });
   return 'chat';
 }
 
@@ -737,11 +923,36 @@ function buildSystemPrompt(language: AgentLanguage) {
 }
 
 async function createChatReply(session: AgentSessionState, input: AgentMessageRequest, intent: AgentIntent) {
+  if (intent === 'styling') {
+    logAgentDev('Styling reply path.', {
+      hasReplicateTextModel: hasReplicateTextModel(),
+      isBlackDressShoeStylingQuestion: isBlackDressShoeStylingQuestion(input.message),
+    });
+  }
+
+  if (intent === 'styling' && isBlackDressShoeStylingQuestion(input.message)) {
+    return buildFallbackStylingReply(input.message, input.language);
+  }
+
   if (hasReplicateTextModel()) {
     const systemPrompt = buildSystemPrompt(input.language);
     const userPrompt =
       intent === 'styling'
-        ? `Provide practical styling advice for this request:\n${input.message}`
+        ? input.language === 'ar'
+          ? [
+              'أجيبي عن سؤال المستخدم نفسه أولًا بشكل مباشر ومحدد.',
+              'قدمي اقتراحات ملموسة مثل الألوان المناسبة، التوليفات، الحذاء، الحقيبة، أو الإكسسوارات عند الحاجة.',
+              'تجنبي العبارات العامة مثل "يمكنني مساعدتك" أو النصائح المبهمة.',
+              'لا تسألي أسئلة متابعة غير ضرورية.',
+              'إذا كان السؤال عن لون جزمة مع فستان أسود، اذكري خيارات واضحة مثل: ذهبي أو فضي للسهرات، نود أو بيج لإطلالة ناعمة، أسود للوك كلاسيكي، أحمر غامق أو عنابي لإطلالة جريئة، وأبيض أو شامبين حسب المناسبة.',
+              `طلب المستخدم: ${input.message}`,
+            ].join('\n')
+          : [
+              'Answer the user’s exact styling question first in a direct, specific way.',
+              'Give concrete recommendations such as colors, pairings, shoes, bags, accessories, or finishing touches when relevant.',
+              'Avoid generic filler and avoid unnecessary follow-up questions.',
+              `User request: ${input.message}`,
+            ].join('\n')
         : `Reply as Glowmia Stylist to this message:\n${input.message}`;
 
     const reply = await generateText({
@@ -757,7 +968,11 @@ async function createChatReply(session: AgentSessionState, input: AgentMessageRe
     return reply.trim();
   }
 
-  if (intent === 'styling') {
+  if ((intent as AgentIntent) === 'styling') {
+    return buildFallbackStylingReply(input.message, input.language);
+  }
+
+  if ((intent as AgentIntent) === 'styling') {
     return input.language === 'ar'
       ? 'يمكنني تنسيق هذه الإطلالة مع أقراط ناعمة، حقيبة صغيرة أنيقة، وحذاء بسيط يبرز الفستان بدون مبالغة.'
       : 'I would style this look with refined earrings, a compact evening bag, and clean shoes that let the dress stay the focus.';
@@ -769,6 +984,11 @@ async function createChatReply(session: AgentSessionState, input: AgentMessageRe
 }
 
 async function buildRecommendationResponse(session: AgentSessionState, input: AgentMessageRequest) {
+  logAgentDev('Recommendation retrieval called', {
+    message: input.message,
+    language: input.language,
+    sessionId: session.id,
+  });
   const dresses = await recommendDresses(input.message, input.language);
   const message =
     input.language === 'ar'
@@ -800,6 +1020,30 @@ async function buildRecommendationResponse(session: AgentSessionState, input: Ag
 }
 
 async function buildEditResponse(session: AgentSessionState, input: AgentMessageRequest) {
+  if (!input.selectedDressId) {
+    const message =
+      input.language === 'ar'
+        ? '\u0645\u0646 \u0641\u0636\u0644\u0643 \u0627\u062e\u062a\u0627\u0631\u064a \u0641\u0633\u062a\u0627\u0646\u064b\u0627 \u0645\u062d\u062f\u062f\u064b\u0627 \u0623\u0648\u0644\u064b\u0627 \u062d\u062a\u0649 \u0623\u0639\u062f\u0644 \u0646\u0641\u0633 \u0627\u0644\u0635\u0648\u0631\u0629.'
+        : 'Please select a specific dress first so I can edit that same image.';
+
+    await appendSessionMessage(session.id, {
+      role: 'assistant',
+      content: message,
+      messageType: 'edit_result',
+    });
+
+    return {
+      session_id: session.id,
+      tool: 'edit',
+      intent: 'edit',
+      language: input.language,
+      message,
+      dresses: [],
+      selected_dress_id: null,
+      edited_image_url: null,
+    } satisfies AgentChatResponse;
+  }
+
   const sourceImage = input.selectedDressImageUrl || session.currentImageUrl;
 
   if (!sourceImage) {
@@ -897,14 +1141,21 @@ async function handleLocalAgentMessage(input: AgentMessageRequest, options: { fo
     };
   }
 
+  const hasExplicitEditableSelection = Boolean(input.selectedDressId && (input.selectedDressImageUrl || session.currentImageUrl));
   const intent = options.forceEdit
     ? 'edit'
     : await detectIntent({
         message: input.message,
         language: input.language,
-        hasSelectedDress: Boolean(input.selectedDressId || session.selectedDressId),
+        hasSelectedDress: hasExplicitEditableSelection,
         modeHint: input.modeHint || null,
       });
+
+  logAgentDev('Detected intent for local handler.', {
+    hasExplicitEditableSelection,
+    intent,
+    modeHint: input.modeHint || null,
+  });
 
   await appendSessionMessage(session.id, {
     role: 'user',
@@ -972,6 +1223,12 @@ async function proxyLegacyAgent(path: string, payload: Record<string, unknown>) 
     throw new Error('Legacy Glowmia agent backend is not configured.');
   }
 
+  logAgentDev('Proxying request to legacy backend.', {
+    baseUrl: config.baseUrl,
+    isLocalRuntime: config.isLocal,
+    path,
+  });
+
   await ensureGlowmiaAgentBackend(config.baseUrl);
   const response = await fetchWithTimeout(
     `${config.baseUrl}${path}`,
@@ -1006,6 +1263,7 @@ async function proxyLegacyAgent(path: string, payload: Record<string, unknown>) 
 export async function createAgentSessionWithFallback(language: AgentLanguage) {
   try {
     const body = await createSessionState(language);
+    logAgentDev('Created session with local Vercel handler.', { language, source: 'vercel' });
     return {
       status: 201,
       body,
@@ -1013,19 +1271,26 @@ export async function createAgentSessionWithFallback(language: AgentLanguage) {
     };
   } catch (error) {
     console.error('[agent.session] Local Vercel session creation failed, attempting FastAPI fallback.', error);
-    return proxyLegacyAgent('/api/v1/sessions', { language });
+    const result = await proxyLegacyAgent('/api/v1/sessions', { language });
+    logAgentDev('Created session with fallback backend.', { language, source: result.source });
+    return result;
   }
 }
 
 export async function sendAgentMessageWithFallback(input: AgentMessageRequest, options: { forceEdit?: boolean } = {}) {
   try {
-    return {
+    const result = {
       ...(await handleLocalAgentMessage(input, options)),
       source: 'vercel' as const,
     };
+    logAgentDev('Responded with local Vercel agent handler.', {
+      forceEdit: Boolean(options.forceEdit),
+      source: result.source,
+    });
+    return result;
   } catch (error) {
     console.error('[agent.message] Local Vercel message handling failed, attempting FastAPI fallback.', error);
-    return proxyLegacyAgent('/api/v1/chat/message', {
+    const result = await proxyLegacyAgent('/api/v1/chat/message', {
       session_id: input.sessionId,
       message: input.message,
       language: input.language,
@@ -1033,5 +1298,10 @@ export async function sendAgentMessageWithFallback(input: AgentMessageRequest, o
       selected_dress_image_url: input.selectedDressImageUrl || null,
       mode_hint: options.forceEdit ? 'edit' : input.modeHint || null,
     });
+    logAgentDev('Responded with fallback agent handler.', {
+      forceEdit: Boolean(options.forceEdit),
+      source: result.source,
+    });
+    return result;
   }
 }
