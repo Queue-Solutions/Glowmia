@@ -47,14 +47,14 @@ export function DesignInfo({ design }: { design: Design }) {
           {localizeText(language, design.subtitle)}
         </p>
         <div className="space-y-3">
-          <h1 className="font-display text-5xl leading-none text-[color:var(--text-primary)] md:text-6xl">
+          <h1 className="font-display text-4xl leading-none text-[color:var(--text-primary)] sm:text-5xl md:text-6xl">
             {localizeText(language, design.name)}
           </h1>
           <p className="max-w-xl text-lg leading-8 text-[color:var(--text-muted)]">
             {localizeText(language, design.description)}
           </p>
         </div>
-        <button type="button" onClick={() => toggleFavorite(design.id)} className={`secondary-button ${saved ? 'secondary-button--active' : ''}`}>
+        <button type="button" onClick={() => toggleFavorite(design.id)} className={`secondary-button w-full sm:w-auto ${saved ? 'secondary-button--active' : ''}`}>
           <Heart className={`h-4 w-4 ${saved ? 'fill-current' : ''}`} />
           {saved ? copyFor(language, glowmiaCopy.favorites.saved) : copyFor(language, glowmiaCopy.favorites.save)}
         </button>

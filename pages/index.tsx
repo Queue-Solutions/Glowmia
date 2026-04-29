@@ -36,9 +36,9 @@ export default function HomePage({ featuredDesigns }: InferGetStaticPropsType<ty
 
       <SiteLayout currentPath="/">
         <HomeHero />
+        <AgentTeaser />
         <BrandIntro />
         <FeaturedDesigns designs={featuredDesigns} />
-        <AgentTeaser />
       </SiteLayout>
     </>
   );

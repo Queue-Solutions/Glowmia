@@ -42,7 +42,7 @@ export function FeedbackSection({ designId }: FeedbackSectionProps) {
   return (
     <section className="space-y-6 rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-6 md:px-8">
       <div className="space-y-2">
-        <h2 className="font-display text-4xl text-[color:var(--text-primary)]">
+        <h2 className="font-display text-3xl text-[color:var(--text-primary)] md:text-4xl">
           {copyFor(language, glowmiaCopy.feedback.title)}
         </h2>
         <p className="text-base leading-8 text-[color:var(--text-muted)]">

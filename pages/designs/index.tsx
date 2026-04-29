@@ -73,7 +73,7 @@ export default function DesignsPage({ designs }: InferGetStaticPropsType<typeof 
         <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6 md:px-10">
           <div className="space-y-3">
             <p className="text-sm uppercase tracking-[0.26em] text-[color:var(--text-muted)]">Glowmia</p>
-            <h1 className="font-display text-5xl text-[color:var(--text-primary)] md:text-6xl">
+            <h1 className="font-display text-4xl text-[color:var(--text-primary)] sm:text-5xl md:text-6xl">
               {copyFor(language, glowmiaCopy.designs.title)}
             </h1>
             <p className="max-w-3xl text-lg leading-8 text-[color:var(--text-muted)]">
@@ -82,20 +82,22 @@ export default function DesignsPage({ designs }: InferGetStaticPropsType<typeof 
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2 pb-1 sm:flex-nowrap sm:overflow-x-auto sm:no-scrollbar">
-              {filterOrder.map((filterKey) => (
-                <button
-                  key={filterKey}
-                  type="button"
-                  onClick={() => setActiveFilter(filterKey)}
-                  className={`pill-button ${activeFilter === filterKey ? 'pill-button--active' : ''}`}
-                >
-                  {copyFor(language, glowmiaCopy.designs.filters[filterKey])}
-                </button>
-              ))}
+            <div className="-mx-1 overflow-x-auto px-1 pb-1 no-scrollbar lg:mx-0 lg:px-0">
+              <div className="flex min-w-max gap-2 lg:min-w-0 lg:flex-wrap">
+                {filterOrder.map((filterKey) => (
+                  <button
+                    key={filterKey}
+                    type="button"
+                    onClick={() => setActiveFilter(filterKey)}
+                    className={`pill-button ${activeFilter === filterKey ? 'pill-button--active' : ''}`}
+                  >
+                    {copyFor(language, glowmiaCopy.designs.filters[filterKey])}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <label className="search-shell">
+            <label className="search-shell max-w-full lg:w-[20rem]">
               <Search className="h-4 w-4 text-[color:var(--text-muted)]" />
               <input
                 value={query}

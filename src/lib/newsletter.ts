@@ -1,4 +1,4 @@
-import type { NextApiRequest } from 'next';
+﻿import type { NextApiRequest } from 'next';
 import { Resend } from 'resend';
 import { getSupabaseAdminClient } from '@/src/lib/adminSupabase';
 
@@ -6,6 +6,7 @@ const NEWSLETTER_TABLE = 'newsletter_subscribers';
 const ABANDONED_CARTS_TABLE = 'abandoned_carts';
 const EMAIL_EVENTS_TABLE = 'email_events';
 const DEFAULT_SITE_URL = 'https://glowmia.vercel.app';
+const DEFAULT_CONTACT_EMAIL = 'glowmia.sa@hotmail.com';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CART_REMINDER_COOLDOWN_HOURS = 48;
 
@@ -305,22 +306,22 @@ function buildItemsHtml(items: MailingCartItem[]) {
       ${items
         .slice(0, 4)
         .map((item) => {
-          const details = [`${item.designName || 'تصميم Glowmia'}`];
+          const details = [`${item.designName || 'ØªØµÙ…ÙŠÙ… Glowmia'}`];
 
           if (item.size) {
-            details.push(`المقاس: ${item.size}`);
+            details.push(`Ø§Ù„Ù…Ù‚Ø§Ø³: ${item.size}`);
           }
 
           if (item.quantity) {
-            details.push(`الكمية: ${item.quantity}`);
+            details.push(`Ø§Ù„ÙƒÙ…ÙŠØ©: ${item.quantity}`);
           }
 
           return `
             <div style="display:grid;grid-template-columns:${item.imageUrl ? '92px 1fr' : '1fr'};gap:12px;align-items:center;border:1px solid rgba(85,67,56,0.08);border-radius:20px;background:rgba(255,255,255,0.72);padding:12px;">
               ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.designName || 'Glowmia'}" style="width:92px;height:118px;border-radius:16px;object-fit:cover;background:#f4ece6;" />` : ''}
               <div>
-                <p style="margin:0 0 6px;font-size:15px;line-height:1.8;color:#241715;font-weight:700;">${item.designName || 'تصميم Glowmia'}</p>
-                <p style="margin:0;font-size:13px;line-height:1.85;color:#7c6960;">${details.slice(1).join(' • ')}</p>
+                <p style="margin:0 0 6px;font-size:15px;line-height:1.8;color:#241715;font-weight:700;">${item.designName || 'ØªØµÙ…ÙŠÙ… Glowmia'}</p>
+                <p style="margin:0;font-size:13px;line-height:1.85;color:#7c6960;">${details.slice(1).join(' â€¢ ')}</p>
               </div>
             </div>
           `;
@@ -331,7 +332,7 @@ function buildItemsHtml(items: MailingCartItem[]) {
 }
 
 function buildEmailText(input: { title: string; body: string[]; ctaLabel: string; ctaHref: string; unsubscribeHref: string }) {
-  return [input.title, ...input.body, `${input.ctaLabel}: ${input.ctaHref}`, `إلغاء الاشتراك: ${input.unsubscribeHref}`].join('\n\n');
+  return [input.title, ...input.body, `${input.ctaLabel}: ${input.ctaHref}`, `Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ: ${input.unsubscribeHref}`].join('\n\n');
 }
 
 export function normalizeNewsletterEmail(value: unknown) {
@@ -377,6 +378,15 @@ export function getNewsletterSender() {
     from,
     fromEmail,
   };
+}
+
+function getGlowmiaContactEmail() {
+  const configured =
+    process.env.GLOWMIA_CONTACT_EMAIL?.trim() ||
+    process.env.CHECKOUT_EMAIL_TO?.trim() ||
+    DEFAULT_CONTACT_EMAIL;
+
+  return normalizeNewsletterEmail(configured) || DEFAULT_CONTACT_EMAIL;
 }
 
 export async function upsertNewsletterSubscriber(input: {
@@ -703,8 +713,8 @@ export async function listNewsletterSubscribers(): Promise<string[]> {
     .filter(Boolean);
 }
 
-function getUnsubscribeHref(fromEmail: string) {
-  return `mailto:${fromEmail}?subject=${encodeURIComponent('إلغاء اشتراك Glowmia')}`;
+function getUnsubscribeHref(contactEmail: string) {
+  return `mailto:${contactEmail}?subject=${encodeURIComponent('Ø¥Ù„ØºØ§Ø¡ Ø§Ø´ØªØ±Ø§Ùƒ Glowmia')}`;
 }
 
 async function sendEmail(input: {
@@ -717,6 +727,7 @@ async function sendEmail(input: {
   const { error } = await input.sender.resend.emails.send({
     from: input.sender.from,
     to: input.to,
+    replyTo: getGlowmiaContactEmail(),
     subject: input.subject,
     html: input.html,
     text: input.text,
@@ -728,28 +739,28 @@ async function sendEmail(input: {
 }
 
 export function buildWeeklyEmail(siteUrl: string, unsubscribeHref: string): WeeklyEmailContent {
-  const subject = '\u2728 تصاميم جديدة من Glowmia بانتظارك';
+  const subject = '\u2728 ØªØµØ§Ù…ÙŠÙ… Ø¬Ø¯ÙŠØ¯Ø© Ù…Ù† Glowmia Ø¨Ø§Ù†ØªØ¸Ø§Ø±Ùƒ';
   const html = buildRtlEmailShell({
     eyebrow: 'Glowmia Weekly',
-    title: 'تصاميم جديدة بانتظارك هذا الأسبوع',
-    lead: 'أضفنا لمسات جديدة واختيارات أنيقة تحافظ على هدوء Glowmia ولمعته الراقية.',
+    title: 'ØªØµØ§Ù…ÙŠÙ… Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ø§Ù†ØªØ¸Ø§Ø±Ùƒ Ù‡Ø°Ø§ Ø§Ù„Ø£Ø³Ø¨ÙˆØ¹',
+    lead: 'Ø£Ø¶ÙÙ†Ø§ Ù„Ù…Ø³Ø§Øª Ø¬Ø¯ÙŠØ¯Ø© ÙˆØ§Ø®ØªÙŠØ§Ø±Ø§Øª Ø£Ù†ÙŠÙ‚Ø© ØªØ­Ø§ÙØ¸ Ø¹Ù„Ù‰ Ù‡Ø¯ÙˆØ¡ Glowmia ÙˆÙ„Ù…Ø¹ØªÙ‡ Ø§Ù„Ø±Ø§Ù‚ÙŠØ©.',
     body: [
-      'هذه الرسالة مخصصة لقائمة صغيرة من المهتمات بمتابعة أحدث التصاميم والإعلانات الهادئة والعودة السلسة إلى تجربة التسوق.',
-      'اكتشفي القطع الجديدة، راجعي اختياراتك السابقة، وابدئي من جديد بإطلالة أقرب لذوقك.',
+      'Ù‡Ø°Ù‡ Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ù…Ø®ØµØµØ© Ù„Ù‚Ø§Ø¦Ù…Ø© ØµØºÙŠØ±Ø© Ù…Ù† Ø§Ù„Ù…Ù‡ØªÙ…Ø§Øª Ø¨Ù…ØªØ§Ø¨Ø¹Ø© Ø£Ø­Ø¯Ø« Ø§Ù„ØªØµØ§Ù…ÙŠÙ… ÙˆØ§Ù„Ø¥Ø¹Ù„Ø§Ù†Ø§Øª Ø§Ù„Ù‡Ø§Ø¯Ø¦Ø© ÙˆØ§Ù„Ø¹ÙˆØ¯Ø© Ø§Ù„Ø³Ù„Ø³Ø© Ø¥Ù„Ù‰ ØªØ¬Ø±Ø¨Ø© Ø§Ù„ØªØ³ÙˆÙ‚.',
+      'Ø§ÙƒØªØ´ÙÙŠ Ø§Ù„Ù‚Ø·Ø¹ Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©ØŒ Ø±Ø§Ø¬Ø¹ÙŠ Ø§Ø®ØªÙŠØ§Ø±Ø§ØªÙƒ Ø§Ù„Ø³Ø§Ø¨Ù‚Ø©ØŒ ÙˆØ§Ø¨Ø¯Ø¦ÙŠ Ù…Ù† Ø¬Ø¯ÙŠØ¯ Ø¨Ø¥Ø·Ù„Ø§Ù„Ø© Ø£Ù‚Ø±Ø¨ Ù„Ø°ÙˆÙ‚Ùƒ.',
     ],
-    ctaLabel: 'اكتشفي تصاميم Glowmia',
+    ctaLabel: 'Ø§ÙƒØªØ´ÙÙŠ ØªØµØ§Ù…ÙŠÙ… Glowmia',
     ctaHref: siteUrl,
-    footerNote: 'تصلك هذه الرسالة لأنك اشتركتِ في تحديثات Glowmia.',
-    unsubscribeLabel: 'لإلغاء الاشتراك من هذه الرسائل اضغطي هنا',
+    footerNote: 'ØªØµÙ„Ùƒ Ù‡Ø°Ù‡ Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ù„Ø£Ù†Ùƒ Ø§Ø´ØªØ±ÙƒØªÙ ÙÙŠ ØªØ­Ø¯ÙŠØ«Ø§Øª Glowmia.',
+    unsubscribeLabel: 'Ù„Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø§Ø´ØªØ±Ø§Ùƒ Ù…Ù† Ù‡Ø°Ù‡ Ø§Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ø¶ØºØ·ÙŠ Ù‡Ù†Ø§',
     unsubscribeHref,
   });
   const text = buildEmailText({
-    title: 'تصاميم جديدة من Glowmia بانتظارك',
+    title: 'ØªØµØ§Ù…ÙŠÙ… Ø¬Ø¯ÙŠØ¯Ø© Ù…Ù† Glowmia Ø¨Ø§Ù†ØªØ¸Ø§Ø±Ùƒ',
     body: [
-      'أضفنا لمسات جديدة واختيارات أنيقة هذا الأسبوع.',
-      'اكتشفي التصاميم الجديدة وراجعي اختياراتك السابقة.',
+      'Ø£Ø¶ÙÙ†Ø§ Ù„Ù…Ø³Ø§Øª Ø¬Ø¯ÙŠØ¯Ø© ÙˆØ§Ø®ØªÙŠØ§Ø±Ø§Øª Ø£Ù†ÙŠÙ‚Ø© Ù‡Ø°Ø§ Ø§Ù„Ø£Ø³Ø¨ÙˆØ¹.',
+      'Ø§ÙƒØªØ´ÙÙŠ Ø§Ù„ØªØµØ§Ù…ÙŠÙ… Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø© ÙˆØ±Ø§Ø¬Ø¹ÙŠ Ø§Ø®ØªÙŠØ§Ø±Ø§ØªÙƒ Ø§Ù„Ø³Ø§Ø¨Ù‚Ø©.',
     ],
-    ctaLabel: 'اكتشفي تصاميم Glowmia',
+    ctaLabel: 'Ø§ÙƒØªØ´ÙÙŠ ØªØµØ§Ù…ÙŠÙ… Glowmia',
     ctaHref: siteUrl,
     unsubscribeHref,
   });
@@ -762,25 +773,25 @@ export function buildCartReminderEmail(input: {
   unsubscribeHref: string;
   items: MailingCartItem[];
 }): WeeklyEmailContent {
-  const subject = '\ud83d\uded2 تصميمك في Glowmia لسه مستنيك';
+  const subject = '\ud83d\uded2 ØªØµÙ…ÙŠÙ…Ùƒ ÙÙŠ Glowmia Ù„Ø³Ù‡ Ù…Ø³ØªÙ†ÙŠÙƒ';
   const html = buildRtlEmailShell({
     eyebrow: 'Glowmia Reminder',
-    title: 'تصميمك ما زال بانتظارك',
-    lead: 'احتفظنا لك باختيارك حتى تكملي الخطوة الأخيرة بهدوء وبدون استعجال.',
+    title: 'ØªØµÙ…ÙŠÙ…Ùƒ Ù…Ø§ Ø²Ø§Ù„ Ø¨Ø§Ù†ØªØ¸Ø§Ø±Ùƒ',
+    lead: 'Ø§Ø­ØªÙØ¸Ù†Ø§ Ù„Ùƒ Ø¨Ø§Ø®ØªÙŠØ§Ø±Ùƒ Ø­ØªÙ‰ ØªÙƒÙ…Ù„ÙŠ Ø§Ù„Ø®Ø·ÙˆØ© Ø§Ù„Ø£Ø®ÙŠØ±Ø© Ø¨Ù‡Ø¯ÙˆØ¡ ÙˆØ¨Ø¯ÙˆÙ† Ø§Ø³ØªØ¹Ø¬Ø§Ù„.',
     body: [
-      'إذا كان هناك تصميم لفت انتباهك، يمكنك الرجوع الآن وإكمال الطلب أو متابعة التعديل من حيث توقفتِ.',
+      'Ø¥Ø°Ø§ ÙƒØ§Ù† Ù‡Ù†Ø§Ùƒ ØªØµÙ…ÙŠÙ… Ù„ÙØª Ø§Ù†ØªØ¨Ø§Ù‡ÙƒØŒ ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„Ø±Ø¬ÙˆØ¹ Ø§Ù„Ø¢Ù† ÙˆØ¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨ Ø£Ùˆ Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„ØªØ¹Ø¯ÙŠÙ„ Ù…Ù† Ø­ÙŠØ« ØªÙˆÙ‚ÙØªÙ.',
     ],
-    ctaLabel: 'كمّلي التسوق الآن',
+    ctaLabel: 'ÙƒÙ…Ù‘Ù„ÙŠ Ø§Ù„ØªØ³ÙˆÙ‚ Ø§Ù„Ø¢Ù†',
     ctaHref: input.siteUrl,
-    footerNote: 'هذه تذكرة لطيفة لأنك شاركتِ بريدك أثناء تجهيز سلتك في Glowmia.',
-    unsubscribeLabel: 'إلغاء رسائل التذكير',
+    footerNote: 'Ù‡Ø°Ù‡ ØªØ°ÙƒØ±Ø© Ù„Ø·ÙŠÙØ© Ù„Ø£Ù†Ùƒ Ø´Ø§Ø±ÙƒØªÙ Ø¨Ø±ÙŠØ¯Ùƒ Ø£Ø«Ù†Ø§Ø¡ ØªØ¬Ù‡ÙŠØ² Ø³Ù„ØªÙƒ ÙÙŠ Glowmia.',
+    unsubscribeLabel: 'Ø¥Ù„ØºØ§Ø¡ Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„ØªØ°ÙƒÙŠØ±',
     unsubscribeHref: input.unsubscribeHref,
     extraHtml: buildItemsHtml(input.items),
   });
   const text = buildEmailText({
-    title: 'تصميمك في Glowmia لسه مستنيك',
-    body: input.items.slice(0, 4).map((item) => `${item.designName || 'تصميم Glowmia'}${item.size ? ` - المقاس ${item.size}` : ''}`),
-    ctaLabel: 'كمّلي التسوق الآن',
+    title: 'ØªØµÙ…ÙŠÙ…Ùƒ ÙÙŠ Glowmia Ù„Ø³Ù‡ Ù…Ø³ØªÙ†ÙŠÙƒ',
+    body: input.items.slice(0, 4).map((item) => `${item.designName || 'ØªØµÙ…ÙŠÙ… Glowmia'}${item.size ? ` - Ø§Ù„Ù…Ù‚Ø§Ø³ ${item.size}` : ''}`),
+    ctaLabel: 'ÙƒÙ…Ù‘Ù„ÙŠ Ø§Ù„ØªØ³ÙˆÙ‚ Ø§Ù„Ø¢Ù†',
     ctaHref: input.siteUrl,
     unsubscribeHref: input.unsubscribeHref,
   });
@@ -795,28 +806,28 @@ export function buildOrderConfirmationEmail(input: {
   orderId: string;
   items: MailingCartItem[];
 }): WeeklyEmailContent {
-  const subject = 'تم استلام طلبك من Glowmia \u2728';
+  const subject = 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨Ùƒ Ù…Ù† Glowmia \u2728';
   const greetingName = normalizeString(input.customerName);
   const html = buildRtlEmailShell({
     eyebrow: 'Glowmia Order',
-    title: greetingName ? `أهلًا ${greetingName}، تم استلام طلبك` : 'تم استلام طلبك بنجاح',
-    lead: 'وصل طلبك إلى فريق Glowmia، وسنتواصل معك قريبًا لتأكيد التفاصيل النهائية.',
+    title: greetingName ? `Ø£Ù‡Ù„Ù‹Ø§ ${greetingName}ØŒ ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨Ùƒ` : 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨Ùƒ Ø¨Ù†Ø¬Ø§Ø­',
+    lead: 'ÙˆØµÙ„ Ø·Ù„Ø¨Ùƒ Ø¥Ù„Ù‰ ÙØ±ÙŠÙ‚ GlowmiaØŒ ÙˆØ³Ù†ØªÙˆØ§ØµÙ„ Ù…Ø¹Ùƒ Ù‚Ø±ÙŠØ¨Ù‹Ø§ Ù„ØªØ£ÙƒÙŠØ¯ Ø§Ù„ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ù†Ù‡Ø§Ø¦ÙŠØ©.',
     body: [
-      'احتفظي برقم الطلب للرجوع إليه عند الحاجة، ويمكنك في أي وقت العودة إلى الموقع لاكتشاف تصاميم أخرى.',
+      'Ø§Ø­ØªÙØ¸ÙŠ Ø¨Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨ Ù„Ù„Ø±Ø¬ÙˆØ¹ Ø¥Ù„ÙŠÙ‡ Ø¹Ù†Ø¯ Ø§Ù„Ø­Ø§Ø¬Ø©ØŒ ÙˆÙŠÙ…ÙƒÙ†Ùƒ ÙÙŠ Ø£ÙŠ ÙˆÙ‚Øª Ø§Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ù„Ø§ÙƒØªØ´Ø§Ù ØªØµØ§Ù…ÙŠÙ… Ø£Ø®Ø±Ù‰.',
     ],
-    ctaLabel: 'زيارة Glowmia',
+    ctaLabel: 'Ø²ÙŠØ§Ø±Ø© Glowmia',
     ctaHref: input.siteUrl,
-    footerNote: 'نشكرك على ثقتك في Glowmia.',
-    unsubscribeLabel: 'للتواصل حول الرسائل',
+    footerNote: 'Ù†Ø´ÙƒØ±Ùƒ Ø¹Ù„Ù‰ Ø«Ù‚ØªÙƒ ÙÙŠ Glowmia.',
+    unsubscribeLabel: 'Ù„Ù„ØªÙˆØ§ØµÙ„ Ø­ÙˆÙ„ Ø§Ù„Ø±Ø³Ø§Ø¦Ù„',
     unsubscribeHref: input.unsubscribeHref,
-    accentLabel: 'رقم الطلب',
+    accentLabel: 'Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨',
     accentValue: input.orderId,
     extraHtml: buildItemsHtml(input.items),
   });
   const text = buildEmailText({
-    title: `تم استلام طلبك من Glowmia - رقم الطلب: ${input.orderId}`,
-    body: ['وصل طلبك إلى فريق Glowmia وسنتواصل معك قريبًا.'],
-    ctaLabel: 'زيارة Glowmia',
+    title: `ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨Ùƒ Ù…Ù† Glowmia - Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨: ${input.orderId}`,
+    body: ['ÙˆØµÙ„ Ø·Ù„Ø¨Ùƒ Ø¥Ù„Ù‰ ÙØ±ÙŠÙ‚ Glowmia ÙˆØ³Ù†ØªÙˆØ§ØµÙ„ Ù…Ø¹Ùƒ Ù‚Ø±ÙŠØ¨Ù‹Ø§.'],
+    ctaLabel: 'Ø²ÙŠØ§Ø±Ø© Glowmia',
     ctaHref: input.siteUrl,
     unsubscribeHref: input.unsubscribeHref,
   });
@@ -831,36 +842,36 @@ export function buildDesignConfirmationEmail(input: {
   imageUrl?: string | null;
   prompt?: string | null;
 }): WeeklyEmailContent {
-  const subject = 'تصميمك في Glowmia جاهز \ud83d\udc97';
+  const subject = 'ØªØµÙ…ÙŠÙ…Ùƒ ÙÙŠ Glowmia Ø¬Ø§Ù‡Ø² \ud83d\udc97';
   const body = [
-    'تم حفظ تصميمك بنجاح، وأصبح جاهزًا للمتابعة مع فريق Glowmia أو لإكمال الطلب لاحقًا.',
+    'ØªÙ… Ø­ÙØ¸ ØªØµÙ…ÙŠÙ…Ùƒ Ø¨Ù†Ø¬Ø§Ø­ØŒ ÙˆØ£ØµØ¨Ø­ Ø¬Ø§Ù‡Ø²Ù‹Ø§ Ù„Ù„Ù…ØªØ§Ø¨Ø¹Ø© Ù…Ø¹ ÙØ±ÙŠÙ‚ Glowmia Ø£Ùˆ Ù„Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨ Ù„Ø§Ø­Ù‚Ù‹Ø§.',
   ];
 
   if (normalizeString(input.prompt)) {
-    body.push(`تفاصيل التعديل: ${normalizeString(input.prompt)}`);
+    body.push(`ØªÙØ§ØµÙŠÙ„ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„: ${normalizeString(input.prompt)}`);
   }
 
   const extraHtml = `
     ${input.imageUrl ? `<div style="margin:18px 0 14px;"><img src="${input.imageUrl}" alt="${input.dressName || 'Glowmia'}" style="width:100%;max-width:280px;border-radius:22px;object-fit:cover;background:#f4ece6;" /></div>` : ''}
-    ${normalizeString(input.dressName) ? `<p style="margin:0 0 10px;font-size:14px;line-height:1.9;color:#7c6960;"><strong style="color:#241715;">التصميم:</strong> ${normalizeString(input.dressName)}</p>` : ''}
+    ${normalizeString(input.dressName) ? `<p style="margin:0 0 10px;font-size:14px;line-height:1.9;color:#7c6960;"><strong style="color:#241715;">Ø§Ù„ØªØµÙ…ÙŠÙ…:</strong> ${normalizeString(input.dressName)}</p>` : ''}
   `;
 
   const html = buildRtlEmailShell({
     eyebrow: 'Glowmia Design',
-    title: 'تصميمك أصبح جاهزًا',
-    lead: 'أبقينا نسختك المحفوظة جاهزة حتى تراجعيها بهدوء أو تكمليها في الوقت المناسب.',
+    title: 'ØªØµÙ…ÙŠÙ…Ùƒ Ø£ØµØ¨Ø­ Ø¬Ø§Ù‡Ø²Ù‹Ø§',
+    lead: 'Ø£Ø¨Ù‚ÙŠÙ†Ø§ Ù†Ø³Ø®ØªÙƒ Ø§Ù„Ù…Ø­ÙÙˆØ¸Ø© Ø¬Ø§Ù‡Ø²Ø© Ø­ØªÙ‰ ØªØ±Ø§Ø¬Ø¹ÙŠÙ‡Ø§ Ø¨Ù‡Ø¯ÙˆØ¡ Ø£Ùˆ ØªÙƒÙ…Ù„ÙŠÙ‡Ø§ ÙÙŠ Ø§Ù„ÙˆÙ‚Øª Ø§Ù„Ù…Ù†Ø§Ø³Ø¨.',
     body,
-    ctaLabel: 'شاهدي Glowmia',
+    ctaLabel: 'Ø´Ø§Ù‡Ø¯ÙŠ Glowmia',
     ctaHref: input.siteUrl,
-    footerNote: 'أرسلنا لك هذه الرسالة لأنك حفظتِ تصميمًا داخل Glowmia.',
-    unsubscribeLabel: 'إيقاف رسائل التصميم',
+    footerNote: 'Ø£Ø±Ø³Ù„Ù†Ø§ Ù„Ùƒ Ù‡Ø°Ù‡ Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ù„Ø£Ù†Ùƒ Ø­ÙØ¸ØªÙ ØªØµÙ…ÙŠÙ…Ù‹Ø§ Ø¯Ø§Ø®Ù„ Glowmia.',
+    unsubscribeLabel: 'Ø¥ÙŠÙ‚Ø§Ù Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„ØªØµÙ…ÙŠÙ…',
     unsubscribeHref: input.unsubscribeHref,
     extraHtml,
   });
   const text = buildEmailText({
-    title: 'تصميمك في Glowmia جاهز',
+    title: 'ØªØµÙ…ÙŠÙ…Ùƒ ÙÙŠ Glowmia Ø¬Ø§Ù‡Ø²',
     body,
-    ctaLabel: 'شاهدي Glowmia',
+    ctaLabel: 'Ø´Ø§Ù‡Ø¯ÙŠ Glowmia',
     ctaHref: input.siteUrl,
     unsubscribeHref: input.unsubscribeHref,
   });
@@ -875,7 +886,7 @@ export async function sendWeeklyNewsletterEmail(email: string) {
     throw new Error('Newsletter email is not configured. Add RESEND_API_KEY and NEWSLETTER_FROM_EMAIL.');
   }
 
-  const content = buildWeeklyEmail(getNewsletterSiteUrl(), getUnsubscribeHref(sender.fromEmail));
+  const content = buildWeeklyEmail(getNewsletterSiteUrl(), getUnsubscribeHref(getGlowmiaContactEmail()));
   await sendEmail({
     sender,
     to: email,
@@ -904,7 +915,7 @@ export async function sendCartReminderEmail(input: { email: string; items: Maili
 
   const content = buildCartReminderEmail({
     siteUrl: getNewsletterSiteUrl(),
-    unsubscribeHref: getUnsubscribeHref(sender.fromEmail),
+    unsubscribeHref: getUnsubscribeHref(getGlowmiaContactEmail()),
     items: input.items,
   });
   await sendEmail({
@@ -940,7 +951,7 @@ export async function sendOrderConfirmationEmail(input: {
 
   const content = buildOrderConfirmationEmail({
     siteUrl: getNewsletterSiteUrl(),
-    unsubscribeHref: getUnsubscribeHref(sender.fromEmail),
+    unsubscribeHref: getUnsubscribeHref(getGlowmiaContactEmail()),
     customerName: input.customerName,
     orderId: input.orderId,
     items: input.items,
@@ -970,7 +981,7 @@ export async function sendDesignConfirmationEmail(input: {
 
   const content = buildDesignConfirmationEmail({
     siteUrl: getNewsletterSiteUrl(),
-    unsubscribeHref: getUnsubscribeHref(sender.fromEmail),
+    unsubscribeHref: getUnsubscribeHref(getGlowmiaContactEmail()),
     dressName: input.dressName,
     imageUrl: input.imageUrl,
     prompt: input.prompt,
@@ -985,3 +996,4 @@ export async function sendDesignConfirmationEmail(input: {
 
   return { ok: true };
 }
+

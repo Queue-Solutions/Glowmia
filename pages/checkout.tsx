@@ -25,6 +25,7 @@ import {
 
 type CheckoutPageProps = {
   designs: Design[];
+  checkoutEmailTo: string;
 };
 
 type CheckoutResponse = {
@@ -58,9 +59,9 @@ type DisplayCheckoutItem =
       quantity: number;
     };
 
-const FORM_SUBMIT_ACTION = 'https://formsubmit.co/queuesolutions25@gmail.com';
 const FORM_SUBMIT_FRAME = 'glowmia-formsubmit-frame';
 const SUCCESS_REDIRECT_DELAY_MS = 500;
+const DEFAULT_CHECKOUT_EMAIL = 'glowmia.sa@hotmail.com';
 
 function joinOrderFieldValues(values: Array<string | null | undefined>) {
   return values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)).join('\n');
@@ -72,12 +73,13 @@ export const getStaticProps: GetStaticProps<CheckoutPageProps> = async () => {
   return {
     props: {
       designs,
+      checkoutEmailTo: process.env.CHECKOUT_EMAIL_TO?.trim() || DEFAULT_CHECKOUT_EMAIL,
     },
     revalidate: 60,
   };
 };
 
-export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof getStaticProps>) {
+export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStaticPropsType<typeof getStaticProps>) {
   const router = useRouter();
   const { language } = useSitePreferencesContext();
   const { entries, hydrated, clearCart } = useCartContext();
@@ -311,7 +313,7 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
     }
 
     const form = document.createElement('form');
-    form.action = FORM_SUBMIT_ACTION;
+    form.action = `https://formsubmit.co/${encodeURIComponent(checkoutEmailTo || DEFAULT_CHECKOUT_EMAIL)}`;
     form.method = 'POST';
     form.target = FORM_SUBMIT_FRAME;
     form.style.display = 'none';
@@ -450,7 +452,7 @@ export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof
                 <ShoppingCart className="h-4 w-4" />
                 Glowmia
               </p>
-              <h1 className="font-display text-5xl text-[color:var(--text-primary)] md:text-6xl">
+              <h1 className="font-display text-4xl text-[color:var(--text-primary)] sm:text-5xl md:text-6xl">
                 {copyFor(language, glowmiaCopy.checkout.title)}
               </h1>
               <p className="max-w-3xl text-lg leading-8 text-[color:var(--text-muted)]">

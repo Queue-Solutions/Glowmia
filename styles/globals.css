@@ -358,6 +358,18 @@ a {
   color: var(--text-primary);
 }
 
+.site-footer__contact {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: color 160ms ease;
+}
+
+.site-footer__contact:hover {
+  color: var(--accent);
+}
+
 .site-footer__credit-logo {
   width: 1.15rem;
   height: 1.15rem;
@@ -772,6 +784,7 @@ a {
   display: flex;
   width: 100%;
   max-width: 20rem;
+  min-width: 0;
   align-items: center;
   gap: 0.65rem;
   border-radius: 999px;
@@ -808,6 +821,7 @@ a {
 .design-card-shell {
   display: flex;
   height: 100%;
+  min-width: 0;
   flex-direction: column;
   overflow: hidden;
   border-radius: 2rem;
@@ -986,6 +1000,7 @@ a {
 
 .cart-size-options {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 
@@ -1972,6 +1987,10 @@ a {
     text-align: center;
   }
 
+  .site-footer__contact {
+    text-align: center;
+  }
+
   .site-footer__newsletter {
     width: 100%;
   }
@@ -2017,6 +2036,7 @@ a {
   /* Design card grid mobile optimization */
   .design-card-grid {
     grid-template-columns: 1fr !important;
+    gap: 1.25rem;
   }
 
   /* Touch-friendly form inputs on mobile */
@@ -2047,6 +2067,48 @@ a {
 
   .cart-size-button {
     flex: 1;
+  }
+
+  .design-card-shell {
+    border-radius: 1.6rem;
+  }
+
+  .design-card__content {
+    gap: 0.55rem;
+    padding: 0.9rem 0.9rem 0.85rem;
+  }
+
+  .design-card__title,
+  .design-card__subtitle,
+  .design-card__description {
+    min-height: 0;
+  }
+
+  .favorite-chip {
+    right: 0.85rem;
+    top: 0.85rem;
+    height: 2.45rem;
+    width: 2.45rem;
+  }
+
+  .lang-ar .favorite-chip {
+    left: 0.85rem;
+    right: auto;
+  }
+
+  .detail-gallery__frame {
+    padding: 0.8rem;
+    border-radius: 1.65rem;
+  }
+
+  .detail-gallery__arrow {
+    height: 2.75rem;
+    width: 2.75rem;
+  }
+
+  .gallery-selector {
+    min-width: calc(50% - 0.25rem);
+    justify-content: center;
   }
 
   .cart-line-item__controls,
@@ -2114,6 +2176,10 @@ a {
     width: 100%;
   }
 
+  .search-shell {
+    max-width: 100%;
+  }
+
   .header-brand-cluster .font-display {
     font-size: 1.7rem;
   }
@@ -2130,6 +2196,15 @@ a {
   .cart-empty-state,
   .checkout-modal__panel {
     border-radius: 1.35rem;
+  }
+
+  .cart-summary-count {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cart-summary-count strong {
+    font-size: 1.7rem;
   }
 
   .checkout-modal {

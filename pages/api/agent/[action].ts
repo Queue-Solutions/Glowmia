@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAgentProxyTimeoutMs, resolveAgentBackendConfig } from '@/src/lib/agentBackendConfig';
-import { ensureGlowmiaAgentBackend } from '@/src/lib/glowmiaAgentRuntime';
+import {
+  createAgentSessionWithFallback,
+  sendAgentMessageWithFallback,
+  type AgentLanguage,
+  type AgentModeHint,
+} from '@/src/server/agent';
 
 type JsonResponse = Record<string, unknown> | { detail: string };
 
@@ -8,54 +12,20 @@ function readString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: number) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
+function readLanguage(value: unknown): AgentLanguage {
+  return value === 'ar' ? 'ar' : 'en';
 }
 
-async function readBackendJson(path: string, payload: Record<string, unknown>) {
-  const { baseUrl } = resolveAgentBackendConfig();
-  await ensureGlowmiaAgentBackend(baseUrl);
-
-  const url = `${baseUrl}${path}`;
-
-  const response = await fetchWithTimeout(
-    url,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    },
-    getAgentProxyTimeoutMs(),
-  );
-
-  const text = await response.text();
-
-  let data: JsonResponse = {};
-  try {
-    data = text ? (JSON.parse(text) as JsonResponse) : {};
-  } catch {
-    data = { detail: text || 'Invalid JSON response from backend' };
-  }
-
-  return {
-    status: response.status,
-    data,
-  };
+function readModeHint(value: unknown): AgentModeHint | null {
+  const normalized = readString(value);
+  return normalized === 'recommend' || normalized === 'edit' || normalized === 'styling' || normalized === 'chat'
+    ? normalized
+    : null;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<JsonResponse>) {
+  res.setHeader('Cache-Control', 'no-store');
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ detail: 'Method not allowed' });
@@ -65,47 +35,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   try {
     if (action === 'session') {
-      const language = readString(req.body?.language) === 'ar' ? 'ar' : 'en';
-      const { status, data } = await readBackendJson('/api/v1/sessions', { language });
-      return res.status(status).json(data);
+      const result = await createAgentSessionWithFallback(readLanguage(req.body?.language));
+      console.info(`[api/agent/[action]] session responded via ${result.source} with status ${result.status}.`);
+      return res.status(result.status).json(result.body);
     }
 
-    if (action === 'message') {
+    if (action === 'message' || action === 'edit') {
       const sessionId = readString(req.body?.sessionId);
       const message = readString(req.body?.message);
-      const language = readString(req.body?.language) === 'ar' ? 'ar' : 'en';
-      const selectedDressId = readString(req.body?.selectedDressId);
-      const selectedDressImageUrl = readString(req.body?.selectedDressImageUrl);
-      const modeHint = readString(req.body?.modeHint);
 
       if (!sessionId || !message) {
         return res.status(400).json({ detail: 'Missing sessionId or message' });
       }
 
-      const { status, data } = await readBackendJson('/api/v1/chat/message', {
-        session_id: sessionId,
-        message,
-        language,
-        selected_dress_id: selectedDressId || null,
-        selected_dress_image_url: selectedDressImageUrl || null,
-        mode_hint: modeHint || null,
-      });
+      const result = await sendAgentMessageWithFallback(
+        {
+          sessionId,
+          message,
+          language: readLanguage(req.body?.language),
+          selectedDressId: readString(req.body?.selectedDressId) || null,
+          selectedDressImageUrl: readString(req.body?.selectedDressImageUrl) || null,
+          modeHint: action === 'edit' ? 'edit' : readModeHint(req.body?.modeHint),
+        },
+        { forceEdit: action === 'edit' },
+      );
 
-      return res.status(status).json(data);
+      console.info(`[api/agent/[action]] ${action} responded via ${result.source} with status ${result.status}.`);
+      return res.status(result.status).json(result.body);
     }
 
     return res.status(404).json({ detail: 'Unknown agent action' });
   } catch (error) {
-    console.error('Glowmia agent proxy failed', error);
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      return res.status(504).json({
-        detail: 'Glowmia stylist took too long to respond. Image edits can take longer than chat replies, so please try again.',
-      });
-    }
-
+    console.error('[api/agent/[action]] Route failed', error);
     return res.status(502).json({
-      detail: 'Glowmia stylist is unavailable right now. Make sure the agent backend is running.',
+      detail: error instanceof Error ? error.message : 'Glowmia stylist is unavailable right now.',
     });
   }
 }

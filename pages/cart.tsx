@@ -255,7 +255,7 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                 <ShoppingCart className="h-4 w-4" />
                 Glowmia
               </p>
-              <h1 className="font-display text-5xl text-[color:var(--text-primary)] md:text-6xl">
+              <h1 className="font-display text-4xl text-[color:var(--text-primary)] sm:text-5xl md:text-6xl">
                 {copyFor(language, glowmiaCopy.cart.title)}
               </h1>
               <p className="max-w-3xl text-lg leading-8 text-[color:var(--text-muted)]">

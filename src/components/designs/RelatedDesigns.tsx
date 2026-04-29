@@ -9,7 +9,7 @@ export function RelatedDesigns({ designs }: { designs: Design[] }) {
   return (
     <section className="space-y-4">
       <div className="space-y-2">
-        <h2 className="font-display text-4xl text-[color:var(--text-primary)]">
+        <h2 className="font-display text-3xl text-[color:var(--text-primary)] md:text-4xl">
           {copyFor(language, glowmiaCopy.detail.relatedLabel)}
         </h2>
         <p className="text-base leading-8 text-[color:var(--text-muted)]">

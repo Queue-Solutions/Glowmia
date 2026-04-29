@@ -448,6 +448,7 @@ export default function AtelierVaultPage({
           emptyInsights: 'لا توجد بيانات تفاعل بعد.',
           customerName: 'الاسم',
           customerPhone: 'الهاتف',
+          customerEmail: 'البريد الإلكتروني',
           customerAddress: 'العنوان',
           customerCity: 'المدينة',
           orderNotes: 'الملاحظات',
@@ -489,6 +490,7 @@ export default function AtelierVaultPage({
           emptyInsights: 'No engagement data yet.',
           customerName: 'Name',
           customerPhone: 'Phone',
+          customerEmail: 'Email',
           customerAddress: 'Address',
           customerCity: 'City',
           orderNotes: 'Notes',
@@ -1052,28 +1054,35 @@ export default function AtelierVaultPage({
         ) : (
           <div className="grid gap-4">
             {checkoutOrders.map((order) => (
-              <article key={order.id} className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] md:p-5">
+              <article key={order.id} className="overflow-hidden rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] md:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
-                  <div className="space-y-4">
+                  <div className="min-w-0 space-y-4">
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{formatAdminDate(order.createdAt)}</p>
-                      <h3 className="mt-2 break-all text-xl font-semibold text-[color:var(--text-primary)]">{order.id}</h3>
+                      <p className="mt-2 text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{insightsUi.orderReference}</p>
+                      <h3 className="mt-2 break-all text-lg font-semibold text-[color:var(--text-primary)] sm:text-xl">{order.id}</h3>
                     </div>
 
                     <div className="grid gap-2 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 text-sm text-[color:var(--text-muted)]">
-                      <p>
+                      <p className="break-words">
                         <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerName}:</span>{' '}
                         {order.customer.name}
                       </p>
-                      <p>
+                      <p className="break-words">
                         <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerPhone}:</span>{' '}
                         {order.customer.phone}
                       </p>
-                      <p>
+                      {order.customer.email ? (
+                        <p className="break-all">
+                          <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerEmail}:</span>{' '}
+                          {order.customer.email}
+                        </p>
+                      ) : null}
+                      <p className="break-words">
                         <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerAddress}:</span>{' '}
                         {order.customer.address}
                       </p>
-                      <p>
+                      <p className="break-words">
                         <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.customerCity}:</span>{' '}
                         {order.customer.city}
                       </p>
@@ -1086,7 +1095,7 @@ export default function AtelierVaultPage({
                     </div>
                     {order.notes ? (
                       <div className="grid gap-2 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 text-sm text-[color:var(--text-muted)]">
-                        <p>
+                        <p className="break-words">
                           <span className="font-medium text-[color:var(--text-primary)]">{insightsUi.orderNotes}:</span>{' '}
                           {order.notes}
                         </p>
@@ -1094,7 +1103,7 @@ export default function AtelierVaultPage({
                     ) : null}
                   </div>
 
-                  <div className="grid gap-3">
+                  <div className="grid min-w-0 gap-3">
                     {order.items.map((item) => (
                       <article key={`${order.id}-${item.designId}-${item.size ?? 'custom'}`} className="grid gap-3 rounded-[1.2rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
                         <button
@@ -1112,9 +1121,9 @@ export default function AtelierVaultPage({
                           />
                         </button>
 
-                        <div className="space-y-2">
+                        <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
+                            <div className="min-w-0">
                               <h4 className="text-base font-semibold text-[color:var(--text-primary)]">{item.designName}</h4>
                               <p className="break-all text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
                                 {insightsUi.dressId}: {item.designId}

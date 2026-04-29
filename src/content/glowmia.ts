@@ -162,14 +162,14 @@ export const glowmiaCopy: CopyTree = {
     featureCta: { en: 'View all designs', ar: 'شاهدي كل التصاميم' },
     agentEyebrow: { en: 'AI Agent', ar: 'الوكيل الذكي' },
     agentTitle: {
-      en: 'Style with Glowmia Stylist.',
+      en: 'Discover our new AI fashion agent.',
       ar: 'تحدثي مع منسقة Glowmia.',
     },
     agentDescription: {
-      en: "Discover dresses, compare moods, and refine a selected look with Glowmia's live styling assistant.",
+      en: "Get instant styling guidance, compare silhouettes, and refine a selected look with Glowmia's live fashion assistant.",
       ar: 'اكتشفي الفساتين وقارني بين الأجواء وكمّلي تعديل الإطلالة مع منسقة Glowmia المباشرة.',
     },
-    agentCta: { en: 'Visit agent page', ar: 'زيارة صفحة الوكيل' },
+    agentCta: { en: 'Open AI fashion agent', ar: 'زيارة صفحة الوكيل' },
   },
   designs: {
     title: { en: 'Design Gallery', ar: 'معرض التصاميم' },

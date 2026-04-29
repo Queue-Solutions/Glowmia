@@ -46,7 +46,7 @@ const socialLinks = [
   },
   {
     label: 'Email',
-    href: 'mailto:ghadah_111@hotmail.com',
+    href: 'mailto:glowmia.sa@hotmail.com',
     Icon: MailIcon,
   },
 ];
@@ -84,6 +84,9 @@ export function SiteFooter() {
               </a>
             ))}
           </div>
+          <a href="mailto:glowmia.sa@hotmail.com" className="site-footer__contact">
+            glowmia.sa@hotmail.com
+          </a>
           <p className="site-footer__copyright">{copyFor(language, glowmiaCopy.footer.copyright)}</p>
           <Link
             href="https://queuesolutions.org/"
