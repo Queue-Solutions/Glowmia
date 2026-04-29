@@ -37,7 +37,6 @@ const runtimeState: RuntimeState =
 function resolveBundledBackendDirectory() {
   const candidates = [
     resolve(process.cwd(), 'Glowmia_Agent', 'backend'),
-    resolve(process.cwd(), 'glowmia-agent', 'backend'),
   ];
 
   for (const candidate of candidates) {
