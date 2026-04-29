@@ -432,6 +432,12 @@ export function AgentExperience() {
   const router = useRouter();
   const { language } = useSitePreferencesContext();
   const copy = copyByLanguage[language];
+  const selectedModeLabel = language === 'ar' ? 'تم الاختيار' : 'Selected';
+  const selectDressLabel = language === 'ar' ? 'اختاري هذا الفستان' : 'Select this dress';
+  const selectedComposerPlaceholder =
+    language === 'ar'
+      ? 'اطلبي نصيحة تنسيق أو طلب تعديل أو ترشيحاً جديداً...'
+      : 'Ask for styling advice, edit request or a new recommendation...';
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -961,7 +967,7 @@ export function AgentExperience() {
                     <span className={`agent-console__badge ${sessionId && !bootstrapping ? 'agent-console__badge--ready' : ''}`}>
                       {bootstrapping ? copy.connecting : copy.connected}
                     </span>
-                    <span className="agent-console__badge">{mode === 'edit' ? copy.editMode : copy.recommendationMode}</span>
+                    <span className="agent-console__badge">{mode === 'edit' ? selectedModeLabel : copy.recommendationMode}</span>
                   </div>
 
                   <div className="agent-console__headline">
@@ -1100,7 +1106,7 @@ export function AgentExperience() {
               </div>
 
               <div className="agent-chat-head__actions">
-                <span className="agent-chat-head__mode-pill">{mode === 'edit' ? copy.editMode : copy.recommendationMode}</span>
+                <span className="agent-chat-head__mode-pill">{mode === 'edit' ? selectedModeLabel : copy.recommendationMode}</span>
                 <button
                   type="button"
                   className="agent-chat-head__new-chat"
@@ -1218,7 +1224,7 @@ export function AgentExperience() {
                                   </div>
 
                                   <button type="button" className="primary-button w-full" onClick={() => handleSelectDressForEdit(dress)}>
-                                    {copy.editThisDress}
+                                    {selectDressLabel}
                                   </button>
                                 </div>
                               </article>
@@ -1506,7 +1512,7 @@ export function AgentExperience() {
             <div className="agent-composer">
               {selectedDress ? (
                 <div className="agent-composer__context">
-                  <span className="agent-composer__context-pill">{copy.editMode}</span>
+                  <span className="agent-composer__context-pill">{selectedModeLabel}</span>
                   <span className="agent-composer__context-name">{localizeDressName(selectedDress, language)}</span>
                 </div>
               ) : null}
@@ -1526,7 +1532,13 @@ export function AgentExperience() {
                     }
                   }}
                   onKeyDown={handleComposerKeyDown}
-                  placeholder={draftLooksLikeEdit ? copy.composerEditPlaceholder : copy.composerPlaceholder}
+                  placeholder={
+                    draftLooksLikeEdit
+                      ? copy.composerEditPlaceholder
+                      : selectedDress
+                        ? selectedComposerPlaceholder
+                        : copy.composerPlaceholder
+                  }
                   className="agent-composer__input no-scrollbar"
                   rows={1}
                 />

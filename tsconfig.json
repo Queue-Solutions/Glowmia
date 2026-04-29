@@ -27,8 +27,8 @@
   "exclude": [
     "node_modules",
     ".next",
-    "Glowmia_Codex_Agent",
-    "Glowmia_Codex_Agent/frontend",
+    "Glowmia_Agent",
+    "Glowmia_Agent/frontend",
     "glowmia-agent"
   ]
 }
