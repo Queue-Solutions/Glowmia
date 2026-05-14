@@ -35,6 +35,7 @@ export type CheckoutOrderRecord = {
     designName: string;
     size: string | null;
     quantity: number;
+    priceSar?: number | null;
     imageUrl: string;
     frontViewUrl: string;
     sideViewUrl: string;

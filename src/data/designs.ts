@@ -10,6 +10,7 @@ export type DesignCategory = 'evening' | 'casual' | 'formal' | 'other';
 export type Design = {
   id: string;
   slug: string;
+  priceSar: number;
   name: LocalizedText;
   subtitle: LocalizedText;
   description: LocalizedText;
@@ -265,6 +266,11 @@ function isRecentDress(createdAt: string | null | undefined, index: number) {
   return daysOld <= 45;
 }
 
+function buildDesignPriceSar(seed: string) {
+  const hash = Array.from(seed).reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  return 150 + (hash % 151);
+}
+
 export function buildDesignSlug(id: string, name: string) {
   const base = slugify(name || 'design');
   return `${base || 'design'}--${id}`;
@@ -286,6 +292,7 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
   return {
     id,
     slug: buildDesignSlug(id, name),
+    priceSar: buildDesignPriceSar(`${id}-${name}-${index}`),
     name: toBilingualText(name, row.name_ar, `Glowmia Design ${index + 1}`),
     subtitle: {
       en: subtitle,
@@ -319,6 +326,10 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
 
 export function localizeText(language: Language, value: LocalizedText) {
   return value[language];
+}
+
+export function formatDesignPrice(priceSar: number) {
+  return `${priceSar} SAR`;
 }
 
 export function getDesignCategoryLabel(category: DesignCategory): LocalizedText {

@@ -8,7 +8,7 @@ import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { useRouter } from 'next/router';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
-import { localizeText, type Design } from '@/src/data/designs';
+import { formatDesignPrice, localizeText, type Design } from '@/src/data/designs';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { useCartContext } from '@/src/context/CartContext';
@@ -368,6 +368,7 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                             <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">
                               {localizeText(language, design.description)}
                             </p>
+                            <p className="cart-line-item__price">{formatDesignPrice(design.priceSar)}</p>
                           </div>
                         </div>
 

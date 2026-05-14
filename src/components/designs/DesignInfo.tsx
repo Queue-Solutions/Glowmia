@@ -7,7 +7,7 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 import { useFavoritesContext } from '@/src/context/FavoritesContext';
 import { useCartContext } from '@/src/context/CartContext';
 import { cartSizes, type CartSize } from '@/src/hooks/useCart';
-import { localizeText } from '@/src/data/designs';
+import { formatDesignPrice, localizeText } from '@/src/data/designs';
 import { SizeChartButton } from '@/src/components/designs/SizeChartButton';
 
 export function DesignInfo({ design }: { design: Design }) {
@@ -53,6 +53,7 @@ export function DesignInfo({ design }: { design: Design }) {
           <p className="max-w-xl text-lg leading-8 text-[color:var(--text-muted)]">
             {localizeText(language, design.description)}
           </p>
+          <p className="design-price design-price--detail">{formatDesignPrice(design.priceSar)}</p>
         </div>
         <button type="button" onClick={() => toggleFavorite(design.id)} className={`secondary-button w-full sm:w-auto ${saved ? 'secondary-button--active' : ''}`}>
           <Heart className={`h-4 w-4 ${saved ? 'fill-current' : ''}`} />

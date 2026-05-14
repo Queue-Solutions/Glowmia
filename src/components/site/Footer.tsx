@@ -88,23 +88,6 @@ export function SiteFooter() {
             glowmia.sa@hotmail.com
           </a> */}
           <p className="site-footer__copyright">{copyFor(language, glowmiaCopy.footer.copyright)}</p>
-          <Link
-            href="https://queuesolutions.org/"
-            target="_blank"
-            rel="noreferrer"
-            className="site-footer__credit"
-          >
-            <Image
-              src="/dresses/covers/queue-logo.jpeg"
-              alt="Queue Solutions"
-              width={22}
-              height={22}
-              className="site-footer__credit-logo"
-            />
-            <span className="font-medium">
-              {language === 'ar' ? 'تم الإنشاء بواسطة Queue Solutions' : 'Created by Queue Solutions'}
-            </span>
-          </Link>
         </div>
       </div>
     </footer>

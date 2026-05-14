@@ -148,7 +148,7 @@ export const glowmiaCopy: CopyTree = {
     },
     introBody: {
       en: 'Every design is presented as a complete portfolio piece with mood, material story, and a clean visual rhythm that lets the dresses speak first.',
-      ar: 'كل تصميم يُعرض كقطعة متكاملة تحمل مزاجًا خاصًا وحكاية خامة وإيقاعًا بصريًا نظيفًا يجعل الفستان هو البطل.',
+      ar: 'كل قطعة في Glowmia خُلقت لتشبهك؛ نعومة تُلامس التفاصيل، ودقة تُحدد الملامح… وحضور يُروى بصمت',
     },
     featureLabel: { en: 'Featured designs', ar: 'تصاميم مميزة' },
     featureTitle: {
@@ -280,7 +280,7 @@ export const glowmiaCopy: CopyTree = {
     city: { en: 'City', ar: 'المدينة' },
     notes: { en: 'Notes', ar: 'ملاحظات' },
     namePlaceholder: { en: 'Your full name', ar: 'اسمك الكامل' },
-    phonePlaceholder: { en: '+20...', ar: '+20...' },
+    phonePlaceholder: { en: '+966...', ar: '+966...' },
     emailPlaceholder: { en: 'name@example.com', ar: 'name@example.com' },
     addressPlaceholder: { en: 'Street and building details', ar: 'الشارع وتفاصيل العنوان' },
     cityPlaceholder: { en: 'Your city', ar: 'اسم المدينة' },

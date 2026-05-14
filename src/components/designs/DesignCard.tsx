@@ -9,7 +9,7 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 import { useFavoritesContext } from '@/src/context/FavoritesContext';
 import { useCartContext } from '@/src/context/CartContext';
 import { cartSizes, type CartSize } from '@/src/hooks/useCart';
-import { localizeText } from '@/src/data/designs';
+import { formatDesignPrice, localizeText } from '@/src/data/designs';
 
 type DesignCardProps = {
   design: Design;
@@ -93,6 +93,7 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
             </h3>
             <p className="design-card__subtitle">{localizeText(language, design.subtitle)}</p>
           </div>
+          <p className="design-price">{formatDesignPrice(design.priceSar)}</p>
           <p className="design-card__description">
             {localizeText(language, design.description)}
           </p>

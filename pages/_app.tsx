@@ -11,7 +11,6 @@ export default function App({ Component, pageProps }: AppProps) {
       <FavoritesProvider>
         <CartProvider>
           <Component {...pageProps} />
-          <div className="site-preview-note">This is a preview version. Some features are limited.</div>
         </CartProvider>
       </FavoritesProvider>
     </SitePreferencesProvider>

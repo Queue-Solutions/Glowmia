@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
-import { localizeText, type Design } from '@/src/data/designs';
+import { formatDesignPrice, localizeText, type Design } from '@/src/data/designs';
 import { fetchSavedDesign, resolveViewerIdentity, type SavedDesignEntry } from '@/src/services/engagement';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
@@ -43,6 +43,7 @@ type DisplayCheckoutItem =
       href: string;
       designName: string;
       description: string;
+      priceSar: number | null;
       size: string | null;
       quantity: number;
     }
@@ -55,6 +56,7 @@ type DisplayCheckoutItem =
       href: string | null;
       designName: string;
       description: string;
+      priceSar: number | null;
       size: string | null;
       quantity: number;
     };
@@ -85,7 +87,7 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
   const { entries, hydrated, clearCart } = useCartContext();
   const [formState, setFormState] = useState({
     name: '',
-    phoneCode: '+20',
+    phoneCode: '+966',
     phone: '',
     email: '',
     address: '',
@@ -223,6 +225,7 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       href: `/designs/${design.slug}`,
       designName: localizeText(language, design.name),
       description: localizeText(language, design.description),
+      priceSar: design.priceSar,
       size: entry.size,
       quantity: entry.quantity,
     }));
@@ -241,6 +244,7 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       href: originalDress ? `/designs/${originalDress.slug}` : null,
       designName: savedDesign.designName || (originalDress ? localizeText(language, originalDress.name) : language === 'ar' ? 'تصميم محفوظ' : 'Saved design'),
       description: savedDesign.prompt || (originalDress ? localizeText(language, originalDress.description) : ''),
+      priceSar: originalDress?.priceSar ?? null,
       size: null,
       quantity: 1,
     };
@@ -336,6 +340,7 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       dress_name: joinOrderFieldValues(displayItems.map((item) => item.designName)),
       size: joinOrderFieldValues(displayItems.map((item) => item.size || 'custom')),
       quantity: joinOrderFieldValues(displayItems.map((item) => String(item.quantity))),
+      price: joinOrderFieldValues(displayItems.map((item) => (item.priceSar ? formatDesignPrice(item.priceSar) : 'custom'))),
       notes: formState.notes,
       edited_image_url: savedDesign?.editedImageUrl || '',
       saved_design_id: savedDesign?.id || '',
@@ -542,6 +547,7 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
                             {item.description ? (
                               <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">{item.description}</p>
                             ) : null}
+                            {item.priceSar ? <p className="cart-line-item__price">{formatDesignPrice(item.priceSar)}</p> : null}
                           </div>
                         </div>
                       </div>

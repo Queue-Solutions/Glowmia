@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-export type CartSize = 'S' | 'M' | 'L';
+export type CartSize = 'S' | 'M' | 'L' | 'XL';
 
 export type CartEntry = {
   designId: string;
@@ -10,7 +10,7 @@ export type CartEntry = {
 };
 
 const DEFAULT_STORAGE_KEY = 'glowmia:cart';
-const VALID_SIZES = new Set<CartSize>(['S', 'M', 'L']);
+const VALID_SIZES = new Set<CartSize>(['S', 'M', 'L', 'XL']);
 
 function normalizeCartEntry(value: unknown): CartEntry | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -47,7 +47,7 @@ function cartKey(designId: string, size: CartSize) {
   return `${designId}::${size}`;
 }
 
-export const cartSizes: CartSize[] = ['S', 'M', 'L'];
+export const cartSizes: CartSize[] = ['S', 'M', 'L', 'XL'];
 
 export function useCart(storageKey = DEFAULT_STORAGE_KEY) {
   const [entries, setEntries] = useState<CartEntry[]>([]);
