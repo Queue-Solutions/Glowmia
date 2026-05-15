@@ -44,6 +44,8 @@ export type CheckoutOrderRecord = {
     savedDesignId?: string | null;
     originalImageUrl?: string | null;
     editedImageUrl?: string | null;
+    unitPrice?: number;
+    lineTotal?: number;
   }>;
   notes: string;
   status: string;

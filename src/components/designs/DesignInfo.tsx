@@ -7,8 +7,9 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 import { useFavoritesContext } from '@/src/context/FavoritesContext';
 import { useCartContext } from '@/src/context/CartContext';
 import { cartSizes, type CartSize } from '@/src/hooks/useCart';
-import { formatDesignPrice, localizeText } from '@/src/data/designs';
+import { localizeText } from '@/src/data/designs';
 import { SizeChartButton } from '@/src/components/designs/SizeChartButton';
+import { formatPrice, getPriceLocale } from '@/src/lib/pricing';
 
 export function DesignInfo({ design }: { design: Design }) {
   const { language } = useSitePreferencesContext();
@@ -17,6 +18,7 @@ export function DesignInfo({ design }: { design: Design }) {
   const saved = isFavorite(design.id);
   const [selectedSize, setSelectedSize] = useState<CartSize>('M');
   const [addedToken, setAddedToken] = useState<number | null>(null);
+  const formattedPrice = formatPrice(design.price, getPriceLocale(language));
 
   const details = [
     ['category', design.categoryLabel],
@@ -53,7 +55,12 @@ export function DesignInfo({ design }: { design: Design }) {
           <p className="max-w-xl text-lg leading-8 text-[color:var(--text-muted)]">
             {localizeText(language, design.description)}
           </p>
-          <p className="design-price design-price--detail">{formatDesignPrice(design.priceSar)}</p>
+          {formattedPrice ? (
+            <div className="design-detail-price" aria-label={language === 'ar' ? 'السعر' : 'Price'}>
+              <span>{language === 'ar' ? 'السعر' : 'Price'}</span>
+              <strong>{formattedPrice}</strong>
+            </div>
+          ) : null}
         </div>
         <button type="button" onClick={() => toggleFavorite(design.id)} className={`secondary-button w-full sm:w-auto ${saved ? 'secondary-button--active' : ''}`}>
           <Heart className={`h-4 w-4 ${saved ? 'fill-current' : ''}`} />

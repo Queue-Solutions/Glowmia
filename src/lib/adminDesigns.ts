@@ -7,6 +7,7 @@ export type AdminDressPayload = {
   nameAr: string | null;
   description: string;
   descriptionAr: string | null;
+  price: number | null;
   category: string;
   occasion: string[];
   occasionAr: string[];
@@ -48,6 +49,20 @@ function asTagList(value: unknown) {
   return Array.from(new Set(source.map((entry) => entry.trim()).filter(Boolean)));
 }
 
+function asOptionalPrice(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const normalized = Number(value);
+
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    return NaN;
+  }
+
+  return Math.round(normalized * 100) / 100;
+}
+
 export function validateAdminDressPayload(body: NextApiRequest['body']): { payload: AdminDressPayload | null; error: string | null } {
   const payload: AdminDressPayload = {
     id: asOptionalText(body?.id),
@@ -55,6 +70,7 @@ export function validateAdminDressPayload(body: NextApiRequest['body']): { paylo
     nameAr: asOptionalText(body?.nameAr),
     description: asText(body?.description),
     descriptionAr: asOptionalText(body?.descriptionAr),
+    price: asOptionalPrice(body?.price),
     category: asText(body?.category).toLowerCase() || 'other',
     occasion: asTagList(body?.occasion),
     occasionAr: asTagList(body?.occasionAr),
@@ -84,6 +100,10 @@ export function validateAdminDressPayload(body: NextApiRequest['body']): { paylo
     return { payload: null, error: 'Name and description are required.' };
   }
 
+  if (Number.isNaN(payload.price)) {
+    return { payload: null, error: 'Price must be a positive number.' };
+  }
+
   if (!payload.coverImageUrl) {
     return { payload: null, error: 'Cover/front image URL is required.' };
   }
@@ -110,6 +130,7 @@ export function toDressInsertPayload(payload: AdminDressPayload) {
     name_ar: payload.nameAr,
     description: payload.description,
     description_ar: payload.descriptionAr,
+    price: payload.price,
     category: payload.category,
     occasion: payload.occasion,
     occasion_ar: payload.occasionAr.length > 0 ? payload.occasionAr : null,

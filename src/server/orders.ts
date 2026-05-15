@@ -1,5 +1,6 @@
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { createCheckoutOrders, getSavedDesignById, markSavedDesignOrdered, type CheckoutOrderRecord } from '@/src/lib/glowmiaOrders';
+import { redeemDiscountCode, validateDiscountCode } from '@/src/lib/discountCodes';
 import {
   clearAbandonedCart,
   isValidNewsletterEmail,
@@ -7,6 +8,7 @@ import {
   trackEmailEvent,
   upsertNewsletterSubscriber,
 } from '@/src/lib/newsletter';
+import { calculateDiscountAmount } from '@/src/lib/pricing';
 import { sendCustomerOrderEmail, sendTeamOrderNotification } from '@/src/server/email';
 
 type CheckoutItemInput = {
@@ -26,13 +28,14 @@ export type OrdersCreateRequestBody = {
   items?: unknown;
   notes?: unknown;
   savedDesignId?: unknown;
+  discountCode?: unknown;
   userId?: unknown;
   guestId?: unknown;
 };
 
 type CheckoutOrderItem = CheckoutOrderRecord['items'][number];
 
-const VALID_SIZES = new Set(['S', 'M', 'L']);
+const VALID_SIZES = new Set(['S', 'M', 'L', 'XL']);
 const MAX_FIELD_LENGTH = 300;
 const MAX_ITEMS = 30;
 
@@ -81,6 +84,7 @@ export async function createOrderFromRequestBody(
   const userId = readTrimmedString(body.userId, 200) || null;
   const guestId = readTrimmedString(body.guestId, 200) || null;
   const savedDesignId = readTrimmedString(body.savedDesignId, 200);
+  const discountCode = readTrimmedString(body.discountCode, 80).toUpperCase();
   const itemInputs = readCheckoutItems(body.items);
 
   if (!customer.name || !customer.phone || !customer.email || !customer.address || !customer.city) {
@@ -115,6 +119,8 @@ export async function createOrderFromRequestBody(
         sideViewUrl: design.galleryImages[1] || design.coverImage,
         backViewUrl: design.galleryImages[2] || design.galleryImages[1] || design.coverImage,
         color: design.color.ar || design.color.en,
+        unitPrice: design.price ?? 0,
+        lineTotal: (design.price ?? 0) * item.quantity,
       });
 
       return accumulator;
@@ -152,6 +158,8 @@ export async function createOrderFromRequestBody(
         savedDesignId: savedDesign.id,
         originalImageUrl: savedDesign.originalImageUrl,
         editedImageUrl: savedDesign.editedImageUrl,
+        unitPrice: originalDress?.price ?? 0,
+        lineTotal: originalDress?.price ?? 0,
       };
     }
 
@@ -161,10 +169,41 @@ export async function createOrderFromRequestBody(
       return { status: 400, body: { error: 'The selected dresses are no longer available.' } };
     }
 
+    const subtotal = items.reduce((sum, item) => sum + (item.lineTotal ?? 0), 0);
+    let appliedDiscount: { code: string; percentage: number; amount: number } | null = null;
+    let discountAmount = 0;
+
+    if (discountCode) {
+      const validDiscount = await validateDiscountCode(discountCode);
+
+      if (!validDiscount) {
+        return { status: 400, body: { error: 'This discount code is invalid or has already been used.' } };
+      }
+
+      discountAmount = calculateDiscountAmount(subtotal, validDiscount.percentage);
+      appliedDiscount = {
+        code: validDiscount.code,
+        percentage: validDiscount.percentage,
+        amount: discountAmount,
+      };
+    }
+
+    const pricingNote =
+      subtotal > 0
+        ? [
+            `Subtotal: ${subtotal}`,
+            appliedDiscount ? `Discount ${appliedDiscount.code} (${appliedDiscount.percentage}%): -${discountAmount}` : '',
+            `Total: ${Math.max(0, subtotal - discountAmount)}`,
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : '';
+    const orderNotes = [notes, pricingNote].filter(Boolean).join('\n\n');
+
     const createdOrders = await createCheckoutOrders({
       customer,
       items,
-      notes,
+      notes: orderNotes,
       userId: savedDesign?.userId || userId,
       guestId: savedDesign?.guestId || guestId,
       status: 'pending',
@@ -176,6 +215,14 @@ export async function createOrderFromRequestBody(
       await markSavedDesignOrdered(savedDesign.id, orderReference);
     }
 
+    if (appliedDiscount && orderReference) {
+      await redeemDiscountCode({
+        code: appliedDiscount.code,
+        orderId: orderReference,
+        customerName: customer.name,
+      });
+    }
+
     await upsertNewsletterSubscriber({
       email: customer.email,
       source: 'order',
@@ -183,6 +230,8 @@ export async function createOrderFromRequestBody(
         order_id: orderReference,
         customer_name: customer.name,
         item_count: items.length,
+        discount_code: appliedDiscount?.code ?? null,
+        discount_amount: appliedDiscount?.amount ?? 0,
       },
     });
 
@@ -193,6 +242,9 @@ export async function createOrderFromRequestBody(
         order_id: orderReference,
         customer_name: customer.name,
         items,
+        subtotal,
+        discount: appliedDiscount,
+        total: Math.max(0, subtotal - discountAmount),
       },
     });
 
@@ -220,7 +272,7 @@ export async function createOrderFromRequestBody(
           size: item.size,
           color: item.color,
         })),
-        notes,
+        notes: orderNotes,
       });
     }
 
@@ -231,6 +283,7 @@ export async function createOrderFromRequestBody(
       body: {
         ok: true,
         orderId: orderReference,
+        discount: appliedDiscount,
       },
     };
   } catch (error) {

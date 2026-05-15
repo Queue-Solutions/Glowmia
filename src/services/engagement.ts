@@ -97,6 +97,21 @@ export type CheckoutOrderEntry = {
   createdAt: string;
 };
 
+export type DiscountCodeEntry = {
+  code: string;
+  percentage: number;
+  createdAt: string;
+  redeemedAt: string | null;
+  redeemedOrderId: string | null;
+  redeemedCustomerName: string | null;
+};
+
+export type AppliedDiscount = {
+  code: string;
+  percentage: number;
+  amount: number;
+};
+
 async function postJson<T>(url: string, body: unknown) {
   const response = await fetch(url, {
     method: 'POST',
@@ -229,4 +244,25 @@ export async function fetchAdminCheckoutOrders() {
   }
 
   return payload.orders ?? [];
+}
+
+export async function fetchAdminDiscountCodes() {
+  const response = await fetch('/api/admin/discount-codes');
+  const payload = (await response.json()) as { codes?: DiscountCodeEntry[]; error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? 'Unable to load discount codes.');
+  }
+
+  return payload.codes ?? [];
+}
+
+export async function generateAdminDiscountCode(percentage: number) {
+  const payload = await postJson<{ code: DiscountCodeEntry }>('/api/admin/discount-codes', { percentage });
+  return payload.code;
+}
+
+export async function validateBuyerDiscountCode(input: { code: string; subtotal: number }) {
+  const payload = await postJson<{ discount: AppliedDiscount }>('/api/discount-code', input);
+  return payload.discount;
 }

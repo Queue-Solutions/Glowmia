@@ -9,7 +9,8 @@ import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext'
 import { useFavoritesContext } from '@/src/context/FavoritesContext';
 import { useCartContext } from '@/src/context/CartContext';
 import { cartSizes, type CartSize } from '@/src/hooks/useCart';
-import { formatDesignPrice, localizeText } from '@/src/data/designs';
+import { localizeText } from '@/src/data/designs';
+import { formatPrice, getPriceLocale } from '@/src/lib/pricing';
 
 type DesignCardProps = {
   design: Design;
@@ -24,6 +25,7 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
   const [burstToken, setBurstToken] = useState<number | null>(null);
   const [selectedSize, setSelectedSize] = useState<CartSize>('M');
   const [addedToken, setAddedToken] = useState<number | null>(null);
+  const formattedPrice = formatPrice(design.price, getPriceLocale(language));
 
   const handleFavoriteToggle = () => {
     toggleFavorite(design.id);
@@ -91,9 +93,15 @@ export function DesignCard({ design, priority = false }: DesignCardProps) {
             <h3 className="design-card__title">
               {localizeText(language, design.name)}
             </h3>
-            <p className="design-card__subtitle">{localizeText(language, design.subtitle)}</p>
+            <div className="design-card__meta-row">
+              <p className="design-card__subtitle">{localizeText(language, design.subtitle)}</p>
+              {formattedPrice ? (
+                <p className="design-card__price-line" aria-label={language === 'ar' ? 'السعر' : 'Price'}>
+                  {formattedPrice}
+                </p>
+              ) : null}
+            </div>
           </div>
-          <p className="design-price">{formatDesignPrice(design.priceSar)}</p>
           <p className="design-card__description">
             {localizeText(language, design.description)}
           </p>

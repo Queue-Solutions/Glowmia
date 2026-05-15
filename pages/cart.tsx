@@ -8,7 +8,7 @@ import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { useRouter } from 'next/router';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
-import { formatDesignPrice, localizeText, type Design } from '@/src/data/designs';
+import { localizeText, type Design } from '@/src/data/designs';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { useCartContext } from '@/src/context/CartContext';
@@ -20,6 +20,7 @@ import {
   normalizeClientEmail,
   setStoredContactEmail,
 } from '@/src/services/mailing';
+import { formatPrice, getPriceLocale } from '@/src/lib/pricing';
 
 type CartPageProps = {
   designs: Design[];
@@ -161,6 +162,14 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
 
     return nextItems;
   }, [cartItems, language, savedDesign, savedDesignBase]);
+  const subtotal = useMemo(
+    () =>
+      cartItems.reduce((sum, { entry, design }) => {
+        return sum + (design?.price ?? 0) * entry.quantity;
+      }, savedDesignBase?.price ?? 0),
+    [cartItems, savedDesignBase],
+  );
+  const formattedSubtotal = formatPrice(subtotal, getPriceLocale(language));
 
   const hasItems = cartItems.length > 0 || savedDesignState === 'loading' || Boolean(savedDesign);
   const effectiveItemCount = totalQuantity + (savedDesign ? 1 : 0);
@@ -318,6 +327,11 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                           <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">
                             {savedDesign.prompt || (language === 'ar' ? 'التصميم المعدل المحفوظ من Glowmia Stylist.' : 'Edited design saved from Glowmia Stylist.')}
                           </p>
+                          {savedDesignBase?.price ? (
+                            <p className="mt-2 text-sm font-semibold text-[color:var(--text-primary)]">
+                              {formatPrice(savedDesignBase.price, getPriceLocale(language))}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 
@@ -368,7 +382,11 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                             <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">
                               {localizeText(language, design.description)}
                             </p>
-                            <p className="cart-line-item__price">{formatDesignPrice(design.priceSar)}</p>
+                            {design.price ? (
+                              <p className="mt-2 text-sm font-semibold text-[color:var(--text-primary)]">
+                                {formatPrice(design.price * entry.quantity, getPriceLocale(language))}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
 
@@ -411,6 +429,12 @@ export default function CartPage({ designs }: InferGetStaticPropsType<typeof get
                     <span>{copyFor(language, glowmiaCopy.cart.itemCount)}</span>
                     <strong>{effectiveItemCount}</strong>
                   </div>
+                  {formattedSubtotal ? (
+                    <div className="cart-summary-count">
+                      <span>{language === 'ar' ? 'الإجمالي' : 'Subtotal'}</span>
+                      <strong>{formattedSubtotal}</strong>
+                    </div>
+                  ) : null}
                   <p className="text-sm leading-7 text-[color:var(--text-muted)]">
                     {copyFor(language, glowmiaCopy.cart.fittingNote)}
                   </p>

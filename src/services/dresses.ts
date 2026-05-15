@@ -32,6 +32,7 @@ const BASE_DRESS_SELECT_FIELDS = [
 
 const DRESS_SELECT_FIELDS = [
   ...BASE_DRESS_SELECT_FIELDS,
+  'price',
   'gallery_image_urls',
   'gallery_images',
   'image_urls',
@@ -73,7 +74,7 @@ async function loadDesignsFromSource() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    const missingGalleryColumn = /gallery_image_urls|gallery_images|image_urls/i.test(error.message);
+    const missingGalleryColumn = /gallery_image_urls|gallery_images|image_urls|price/i.test(error.message);
 
     if (missingGalleryColumn) {
       const fallbackResponse = await supabase

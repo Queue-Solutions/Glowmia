@@ -4,6 +4,11 @@ import { createOrderFromRequestBody, type OrdersCreateRequestBody } from '@/src/
 type ApiResponse = {
   ok?: boolean;
   orderId?: string;
+  discount?: {
+    code: string;
+    percentage: number;
+    amount: number;
+  } | null;
   error?: string;
 };
 

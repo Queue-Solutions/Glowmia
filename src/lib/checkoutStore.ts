@@ -12,7 +12,7 @@ export type StoredCheckoutItem = {
   designId: string;
   designName: string;
   slug: string;
-  size: 'S' | 'M' | 'L';
+  size: 'S' | 'M' | 'L' | 'XL';
   quantity: number;
   imageUrl: string;
 };

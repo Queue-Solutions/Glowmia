@@ -8,8 +8,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { GetStaticProps, InferGetStaticPropsType } from 'next';
 import { SiteLayout } from '@/src/components/layout/SiteLayout';
 import { copyFor, glowmiaCopy } from '@/src/content/glowmia';
-import { formatDesignPrice, localizeText, type Design } from '@/src/data/designs';
-import { fetchSavedDesign, resolveViewerIdentity, type SavedDesignEntry } from '@/src/services/engagement';
+import { localizeText, type Design } from '@/src/data/designs';
+import { fetchSavedDesign, resolveViewerIdentity, validateBuyerDiscountCode, type AppliedDiscount, type SavedDesignEntry } from '@/src/services/engagement';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import { useCartContext } from '@/src/context/CartContext';
@@ -22,6 +22,7 @@ import {
   normalizeClientEmail,
   setStoredContactEmail,
 } from '@/src/services/mailing';
+import { calculateDiscountAmount, formatPrice, getPriceLocale } from '@/src/lib/pricing';
 
 type CheckoutPageProps = {
   designs: Design[];
@@ -31,6 +32,7 @@ type CheckoutPageProps = {
 type CheckoutResponse = {
   ok?: boolean;
   orderId?: string;
+  discount?: AppliedDiscount | null;
   error?: string;
 };
 
@@ -43,9 +45,10 @@ type DisplayCheckoutItem =
       href: string;
       designName: string;
       description: string;
-      priceSar: number | null;
       size: string | null;
       quantity: number;
+      unitPrice: number;
+      lineTotal: number;
     }
   | {
       key: string;
@@ -56,9 +59,10 @@ type DisplayCheckoutItem =
       href: string | null;
       designName: string;
       description: string;
-      priceSar: number | null;
       size: string | null;
       quantity: number;
+      unitPrice: number;
+      lineTotal: number;
     };
 
 const FORM_SUBMIT_FRAME = 'glowmia-formsubmit-frame';
@@ -100,6 +104,10 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
   const [submitState, setSubmitState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [discountCode, setDiscountCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
+  const [discountState, setDiscountState] = useState<'idle' | 'checking' | 'applied' | 'error'>('idle');
+  const [discountError, setDiscountError] = useState('');
 
   const designsById = useMemo(() => new Map(designs.map((design) => [design.id, design])), [designs]);
 
@@ -225,9 +233,10 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       href: `/designs/${design.slug}`,
       designName: localizeText(language, design.name),
       description: localizeText(language, design.description),
-      priceSar: design.priceSar,
       size: entry.size,
       quantity: entry.quantity,
+      unitPrice: design.price ?? 0,
+      lineTotal: (design.price ?? 0) * entry.quantity,
     }));
 
     if (!savedDesign) {
@@ -244,15 +253,23 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       href: originalDress ? `/designs/${originalDress.slug}` : null,
       designName: savedDesign.designName || (originalDress ? localizeText(language, originalDress.name) : language === 'ar' ? 'تصميم محفوظ' : 'Saved design'),
       description: savedDesign.prompt || (originalDress ? localizeText(language, originalDress.description) : ''),
-      priceSar: originalDress?.priceSar ?? null,
       size: null,
       quantity: 1,
+      unitPrice: originalDress?.price ?? 0,
+      lineTotal: originalDress?.price ?? 0,
     };
 
     return [savedDesignDisplayItem, ...cartDisplayItems];
   }, [checkoutItems, designsById, language, savedDesign]);
 
   const totalQuantity = useMemo(() => displayItems.reduce((sum, item) => sum + item.quantity, 0), [displayItems]);
+  const subtotal = useMemo(() => displayItems.reduce((sum, item) => sum + item.lineTotal, 0), [displayItems]);
+  const discountAmount = appliedDiscount ? calculateDiscountAmount(subtotal, appliedDiscount.percentage) : 0;
+  const total = Math.max(0, subtotal - discountAmount);
+  const priceLocale = getPriceLocale(language);
+  const formattedSubtotal = formatPrice(subtotal, priceLocale);
+  const formattedDiscount = formatPrice(discountAmount, priceLocale);
+  const formattedTotal = formatPrice(total, priceLocale);
   const hasItems = hydrated && (displayItems.length > 0 || savedDesignState === 'loading');
   const reminderItems = useMemo(
     () =>
@@ -299,6 +316,30 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
     setError('');
   };
 
+  const handleApplyDiscount = async () => {
+    const trimmedCode = discountCode.trim();
+
+    if (!trimmedCode) {
+      setDiscountState('error');
+      setDiscountError(language === 'ar' ? 'أدخلي كود الخصم أولاً.' : 'Enter a discount code first.');
+      return;
+    }
+
+    setDiscountState('checking');
+    setDiscountError('');
+
+    try {
+      const discount = await validateBuyerDiscountCode({ code: trimmedCode, subtotal });
+      setAppliedDiscount(discount);
+      setDiscountCode(discount.code);
+      setDiscountState('applied');
+    } catch (discountApplyError) {
+      setAppliedDiscount(null);
+      setDiscountState('error');
+      setDiscountError(discountApplyError instanceof Error ? discountApplyError.message : language === 'ar' ? 'تعذر تطبيق كود الخصم.' : 'Unable to apply this discount code.');
+    }
+  };
+
   const submitOrderEmail = (fullPhone: string) => {
     if (typeof document === 'undefined') {
       throw new Error('Form submission is only available in the browser.');
@@ -340,7 +381,12 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       dress_name: joinOrderFieldValues(displayItems.map((item) => item.designName)),
       size: joinOrderFieldValues(displayItems.map((item) => item.size || 'custom')),
       quantity: joinOrderFieldValues(displayItems.map((item) => String(item.quantity))),
-      price: joinOrderFieldValues(displayItems.map((item) => (item.priceSar ? formatDesignPrice(item.priceSar) : 'custom'))),
+      unit_price: joinOrderFieldValues(displayItems.map((item) => formatPrice(item.unitPrice, 'en-SA') || '0')),
+      line_total: joinOrderFieldValues(displayItems.map((item) => formatPrice(item.lineTotal, 'en-SA') || '0')),
+      subtotal: formatPrice(subtotal, 'en-SA') || '',
+      discount_code: appliedDiscount?.code || '',
+      discount_amount: appliedDiscount ? formatPrice(discountAmount, 'en-SA') : '',
+      order_total: formatPrice(total, 'en-SA') || '',
       notes: formState.notes,
       edited_image_url: savedDesign?.editedImageUrl || '',
       saved_design_id: savedDesign?.id || '',
@@ -406,6 +452,7 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
             quantity: entry.quantity,
           })),
           savedDesignId: savedDesign?.id || null,
+          discountCode: appliedDiscount?.code || null,
         }),
       });
       const data = (await response.json()) as CheckoutResponse;
@@ -421,6 +468,9 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
       }
 
       setOrderId(data.orderId || '');
+      if (data.discount) {
+        setAppliedDiscount(data.discount);
+      }
       setSubmitState('success');
       clearCart();
       window.setTimeout(() => {
@@ -547,7 +597,11 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
                             {item.description ? (
                               <p className="mt-2 line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">{item.description}</p>
                             ) : null}
-                            {item.priceSar ? <p className="cart-line-item__price">{formatDesignPrice(item.priceSar)}</p> : null}
+                            {item.lineTotal > 0 ? (
+                              <p className="mt-2 text-sm font-semibold text-[color:var(--text-primary)]">
+                                {formatPrice(item.lineTotal, priceLocale)}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -564,6 +618,56 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
                   <p className="text-sm leading-7 text-[color:var(--text-muted)]">
                     {copyFor(language, glowmiaCopy.checkout.formDescription)}
                   </p>
+                </div>
+
+                {formattedSubtotal ? (
+                  <div className="grid gap-3 rounded-[1.25rem] border border-[color:var(--line)] bg-[color:var(--surface)] p-4">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-[color:var(--text-muted)]">{language === 'ar' ? 'الإجمالي قبل الخصم' : 'Subtotal'}</span>
+                      <strong className="text-[color:var(--text-primary)]">{formattedSubtotal}</strong>
+                    </div>
+                    {appliedDiscount && formattedDiscount ? (
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-[color:var(--text-muted)]">
+                          {language === 'ar' ? 'الخصم' : 'Discount'} ({appliedDiscount.code})
+                        </span>
+                        <strong className="text-[color:var(--text-primary)]">-{formattedDiscount}</strong>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-3 border-t border-[color:var(--line)] pt-3 text-base">
+                      <span className="font-medium text-[color:var(--text-primary)]">{language === 'ar' ? 'الإجمالي النهائي' : 'Total'}</span>
+                      <strong className="text-[color:var(--text-primary)]">{formattedTotal}</strong>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-2">
+                  <label className="checkout-field">
+                    <span>{language === 'ar' ? 'كود الخصم' : 'Discount code'}</span>
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <input
+                        value={discountCode}
+                        onChange={(event) => {
+                          setDiscountCode(event.target.value.toUpperCase());
+                          setAppliedDiscount(null);
+                          setDiscountState('idle');
+                          setDiscountError('');
+                        }}
+                        placeholder={language === 'ar' ? 'أدخلي الكود' : 'Enter code'}
+                        className="field-input"
+                      />
+                      <button type="button" onClick={() => void handleApplyDiscount()} className="secondary-button justify-center" disabled={discountState === 'checking'}>
+                        {discountState === 'checking' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {language === 'ar' ? 'تطبيق' : 'Apply'}
+                      </button>
+                    </div>
+                  </label>
+                  {discountState === 'applied' && appliedDiscount ? (
+                    <p className="text-sm text-[color:var(--text-muted)]">
+                      {language === 'ar' ? 'تم تطبيق الخصم.' : 'Discount applied.'}
+                    </p>
+                  ) : null}
+                  {discountState === 'error' && discountError ? <p className="checkout-error">{discountError}</p> : null}
                 </div>
 
                 <label className="checkout-field">

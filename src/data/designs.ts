@@ -1,4 +1,5 @@
 import type { Language } from '@/src/content/glowmia';
+import { normalizePrice } from '@/src/lib/pricing';
 
 export type LocalizedText = {
   en: string;
@@ -24,6 +25,7 @@ export type Design = {
   style: LocalizedText;
   fabric: LocalizedText;
   fit: LocalizedText;
+  price: number | null;
   coverImage: string;
   coverImagePosition?: string;
   detailImage?: string;
@@ -54,6 +56,8 @@ export type DressRow = {
   fabric_ar?: string | null;
   fit?: string | null;
   fit_ar?: string | null;
+  price?: number | string | null;
+  price_egp?: number | string | null;
   image_url?: string | null;
   front_view_url?: string | null;
   side_view_url?: string | null;
@@ -68,6 +72,22 @@ export type DressRow = {
 export const designCategories: DesignCategory[] = ['evening', 'casual', 'formal', 'other'];
 
 const FALLBACK_IMAGE = '/glowmia-logo.svg';
+const TEMPORARY_PRICE_BY_ID: Record<string, number> = {
+  'fc159002-ae07-46d7-a607-0aa39db217eb': 256,
+  'c26a0550-94ba-4898-95b4-8160d0317915': 289,
+  '606916b9-e0c4-4c12-b0a6-b56343f47cdb': 315,
+  'c535cfd2-b456-4ba0-ac6a-05d9c2cb1d92': 230,
+  'fdc2c0ce-ab77-4b19-b006-085c65002b9d': 340,
+  'df2bfef5-b1a5-4ec0-8286-61ddd559b67e': 275,
+  'ab7f52b3-d9fd-4bb9-a41b-c7da8caf3904': 299,
+  '9480270f-ce74-4230-aa99-3769b1e708cd': 325,
+  '3f7c532f-818c-40e5-ae05-6da34a9854fd': 260,
+  '2d6323e7-2d6f-4de9-9f04-383df637fbc4': 390,
+};
+
+function getTemporaryDesignPrice(id: string, index: number) {
+  return TEMPORARY_PRICE_BY_ID[id] ?? 250 + index * 15;
+}
 
 function cleanText(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
@@ -288,6 +308,7 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
   const descriptionAr = normalizeTextValue(row.description_ar, buildArabicDescriptionFallback(row));
   const subtitle = buildSubtitleValue(row, 'en');
   const subtitleAr = buildSubtitleValue(row, 'ar');
+  const rowPrice = normalizePrice(row.price ?? row.price_egp);
 
   return {
     id,
@@ -315,6 +336,7 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
     style: toBilingualText(row.style, row.style_ar, titleCase(category === 'other' ? 'signature' : category)),
     fabric: toBilingualText(row.fabric, row.fabric_ar, 'Fabric pending'),
     fit: toBilingualText(row.fit, row.fit_ar, 'Fit pending'),
+    price: rowPrice ?? getTemporaryDesignPrice(id, index),
     coverImage,
     coverImagePosition: 'center top',
     detailImage,

@@ -3,18 +3,27 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, Loader2, LogOut, Menu, Pencil, Plus, Shield, Star, Trash2, X } from 'lucide-react';
+import { BadgePercent, Heart, Loader2, LogOut, Menu, Pencil, Plus, Shield, Star, Trash2, X } from 'lucide-react';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import type { Design } from '@/src/data/designs';
 import { getAdminUsernameFromRequest, isAdminConfigured } from '@/src/lib/adminAuth';
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import type { Language } from '@/src/content/glowmia';
-import { fetchAdminCheckoutOrders, fetchAdminInsights, type AdminInsights, type CheckoutOrderEntry } from '@/src/services/engagement';
+import {
+  fetchAdminCheckoutOrders,
+  fetchAdminDiscountCodes,
+  fetchAdminInsights,
+  generateAdminDiscountCode,
+  type AdminInsights,
+  type CheckoutOrderEntry,
+  type DiscountCodeEntry,
+} from '@/src/services/engagement';
+import { formatPrice, getPriceLocale } from '@/src/lib/pricing';
 
 type AdminPageProps = { configured: boolean; authenticated: boolean; designs: Design[] };
 type EditorMode = 'create' | 'edit' | null;
 type OptionItem = { value: string; en: string; ar: string };
-type AdminView = 'catalog' | 'insights' | 'orders';
+type AdminView = 'catalog' | 'insights' | 'orders' | 'discounts';
 
 const ADMIN_PREVIEW_FALLBACK_IMAGE = '/glowmia-logo.svg';
 
@@ -23,6 +32,7 @@ type AdminFormState = {
   nameAr: string;
   description: string;
   descriptionAr: string;
+  price: string;
   category: string;
   occasion: string;
   occasionAr: string;
@@ -48,6 +58,7 @@ const initialAdminForm: AdminFormState = {
   nameAr: '',
   description: '',
   descriptionAr: '',
+  price: '',
   category: 'evening',
   occasion: '',
   occasionAr: '',
@@ -158,6 +169,8 @@ const adminCopy = {
     designNameAr: 'Design name in Arabic',
     description: 'Description',
     descriptionAr: 'Description in Arabic',
+    price: 'Price',
+    pricePlaceholder: 'Price in SAR',
     category: 'Category',
     color: 'Color',
     sleeveType: 'Sleeve type',
@@ -245,6 +258,8 @@ const adminCopy = {
     designNameAr: 'اسم التصميم بالعربية',
     description: 'الوصف',
     descriptionAr: 'الوصف بالعربية',
+    price: 'السعر',
+    pricePlaceholder: 'السعر بالريال السعودي',
     category: 'الفئة',
     color: 'اللون',
     sleeveType: 'نوع الكم',
@@ -356,6 +371,7 @@ function designToFormState(design: Design): AdminFormState {
     nameAr: design.name.ar === design.name.en ? '' : design.name.ar,
     description: design.description.en,
     descriptionAr: design.description.ar === design.description.en ? '' : design.description.ar,
+    price: design.price ? String(design.price) : '',
     category: design.category,
     occasion: design.occasion.en,
     occasionAr: design.occasion.ar === design.occasion.en ? '' : design.occasion.ar,
@@ -425,6 +441,7 @@ export default function AtelierVaultPage({
           catalogTab: 'التصاميم',
           insightsTab: 'الرؤى',
           ordersTab: 'طلبات الشراء',
+          discountsTab: 'أكواد الخصم',
           refresh: 'تحديث',
           insightsTitle: 'رؤى Glowmia',
           insightsDescription: 'شاهدي التفاعل على التصاميم وآراء الزوار وتقييمات الوكيل في مكان واحد.',
@@ -462,11 +479,23 @@ export default function AtelierVaultPage({
           quantity: 'الكمية',
           dressId: 'رقم التصميم',
           color: 'اللون',
+          discountsTitle: 'أكواد الخصم',
+          discountsDescription: 'أنشئي كود خصم لمشتري واحد لاستخدامه في صفحة الدفع.',
+          discountPercent: 'نسبة الخصم',
+          generateDiscount: 'إنشاء كود',
+          generatingDiscount: 'جارٍ الإنشاء...',
+          noDiscountCodes: 'لا توجد أكواد خصم بعد.',
+          discountCode: 'الكود',
+          discountStatus: 'الحالة',
+          discountActive: 'متاح',
+          discountRedeemed: 'مستخدم',
+          redeemedBy: 'استخدمه',
         }
       : {
           catalogTab: 'Catalog',
           insightsTab: 'Insights',
           ordersTab: 'Orders',
+          discountsTab: 'Discounts',
           refresh: 'Refresh',
           insightsTitle: 'Glowmia insights',
           insightsDescription: 'See design engagement, visitor comments, and agent ratings in one place.',
@@ -504,6 +533,17 @@ export default function AtelierVaultPage({
           quantity: 'Qty',
           dressId: 'Design ID',
           color: 'Color',
+          discountsTitle: 'Discount codes',
+          discountsDescription: 'Generate a one-buyer checkout discount code for a customer.',
+          discountPercent: 'Discount percent',
+          generateDiscount: 'Generate code',
+          generatingDiscount: 'Generating...',
+          noDiscountCodes: 'No discount codes yet.',
+          discountCode: 'Code',
+          discountStatus: 'Status',
+          discountActive: 'Active',
+          discountRedeemed: 'Redeemed',
+          redeemedBy: 'Redeemed by',
         };
 
   const [catalogDesigns, setCatalogDesigns] = useState(designs);
@@ -529,6 +569,11 @@ export default function AtelierVaultPage({
   const [checkoutOrders, setCheckoutOrders] = useState<CheckoutOrderEntry[] | null>(null);
   const [checkoutOrdersLoading, setCheckoutOrdersLoading] = useState(false);
   const [checkoutOrdersError, setCheckoutOrdersError] = useState('');
+  const [discountCodes, setDiscountCodes] = useState<DiscountCodeEntry[] | null>(null);
+  const [discountCodesLoading, setDiscountCodesLoading] = useState(false);
+  const [discountCodesError, setDiscountCodesError] = useState('');
+  const [discountPercentage, setDiscountPercentage] = useState('10');
+  const [discountGenerateState, setDiscountGenerateState] = useState<'idle' | 'saving'>('idle');
   const [orderPreview, setOrderPreview] = useState<{ src: string; alt: string } | null>(null);
 
   const editorOpen = editorMode !== null;
@@ -671,6 +716,19 @@ export default function AtelierVaultPage({
     }
   }, []);
 
+  const loadDiscountCodes = useCallback(async () => {
+    setDiscountCodesLoading(true);
+    setDiscountCodesError('');
+
+    try {
+      setDiscountCodes(await fetchAdminDiscountCodes());
+    } catch (error) {
+      setDiscountCodesError(error instanceof Error ? error.message : 'Unable to load discount codes.');
+    } finally {
+      setDiscountCodesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authenticated || !configured || activeView !== 'insights' || insightsLoading || insights) {
       return;
@@ -686,6 +744,30 @@ export default function AtelierVaultPage({
 
     void loadCheckoutOrders();
   }, [activeView, authenticated, checkoutOrders, checkoutOrdersLoading, configured, loadCheckoutOrders]);
+
+  useEffect(() => {
+    if (!authenticated || !configured || activeView !== 'discounts' || discountCodesLoading || discountCodes) {
+      return;
+    }
+
+    void loadDiscountCodes();
+  }, [activeView, authenticated, configured, discountCodes, discountCodesLoading, loadDiscountCodes]);
+
+  const handleGenerateDiscountCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDiscountGenerateState('saving');
+    setDiscountCodesError('');
+
+    try {
+      const nextCode = await generateAdminDiscountCode(Number(discountPercentage));
+      setDiscountCodes((current) => [nextCode, ...(current ?? [])]);
+      setDiscountPercentage('10');
+    } catch (error) {
+      setDiscountCodesError(error instanceof Error ? error.message : 'Unable to generate discount code.');
+    } finally {
+      setDiscountGenerateState('idle');
+    }
+  };
 
   const scrollToDesigns = () => {
     setActiveView('catalog');
@@ -1159,6 +1241,79 @@ export default function AtelierVaultPage({
     </section>
   );
 
+  const discountCodesView = (
+    <section className="space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <h2 className="font-display text-3xl text-[color:var(--text-primary)] sm:text-4xl md:text-5xl">{insightsUi.discountsTitle}</h2>
+          <p className="max-w-3xl text-sm leading-7 text-[color:var(--text-muted)] md:text-base md:leading-8">{insightsUi.discountsDescription}</p>
+        </div>
+        <button type="button" onClick={() => void loadDiscountCodes()} className="secondary-button" disabled={discountCodesLoading}>
+          {discountCodesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {insightsUi.refresh}
+        </button>
+      </div>
+
+      <form onSubmit={handleGenerateDiscountCode} className="grid gap-3 rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] sm:grid-cols-[minmax(0,1fr)_auto] md:p-5">
+        <Field label={insightsUi.discountPercent}>
+          <input
+            value={discountPercentage}
+            onChange={(event) => setDiscountPercentage(event.target.value)}
+            className="field-input"
+            inputMode="numeric"
+            min={1}
+            max={100}
+            type="number"
+          />
+        </Field>
+        <div className="flex items-end">
+          <button type="submit" className="primary-button w-full sm:w-auto" disabled={discountGenerateState === 'saving'}>
+            {discountGenerateState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgePercent className="h-4 w-4" />}
+            {discountGenerateState === 'saving' ? insightsUi.generatingDiscount : insightsUi.generateDiscount}
+          </button>
+        </div>
+      </form>
+
+      {discountCodesError ? <div className="rounded-[1.5rem] border border-[#b2555d]/20 bg-[#b2555d]/10 px-4 py-4 text-sm text-[#b2555d]">{discountCodesError}</div> : null}
+
+      {!discountCodes && discountCodesLoading ? (
+        <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-10 text-center text-sm text-[color:var(--text-muted)]">
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {insightsUi.refresh}
+          </span>
+        </div>
+      ) : null}
+
+      {discountCodes ? (
+        discountCodes.length === 0 ? (
+          <div className="rounded-[1.5rem] border border-dashed border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-10 text-center text-sm text-[color:var(--text-muted)]">
+            {insightsUi.noDiscountCodes}
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {discountCodes.map((entry) => (
+              <article key={entry.code} className="grid gap-3 rounded-[1.3rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{formatAdminDate(entry.createdAt)}</p>
+                  <h3 className="break-all text-2xl font-semibold text-[color:var(--text-primary)]">{entry.code}</h3>
+                  <p className="text-sm text-[color:var(--text-muted)]">
+                    {entry.percentage}% · {insightsUi.discountStatus}: {entry.redeemedAt ? insightsUi.discountRedeemed : insightsUi.discountActive}
+                  </p>
+                  {entry.redeemedAt ? (
+                    <p className="text-sm text-[color:var(--text-muted)]">
+                      {insightsUi.redeemedBy}: {entry.redeemedCustomerName || '—'} · {entry.redeemedOrderId || '—'}
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        )
+      ) : null}
+    </section>
+  );
+
   const renderAuthless = !configured ? (
     <section className="rounded-[2rem] border border-dashed border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-8">
       <h2 className="font-display text-3xl text-[color:var(--text-primary)]">{ui.adminSetupTitle}</h2>
@@ -1293,6 +1448,19 @@ export default function AtelierVaultPage({
                       type="button"
                       onClick={() => {
                         setMobileAdminMenuOpen(false);
+                        setActiveView('discounts');
+                        if (!discountCodesLoading) {
+                          void loadDiscountCodes();
+                        }
+                      }}
+                      className="secondary-button w-full justify-center"
+                    >
+                      {insightsUi.discountsTab}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileAdminMenuOpen(false);
                         openCreateEditor();
                       }}
                       className="primary-button w-full justify-center"
@@ -1306,14 +1474,16 @@ export default function AtelierVaultPage({
                         setMobileAdminMenuOpen(false);
                         if (activeView === 'orders') {
                           void loadCheckoutOrders();
+                        } else if (activeView === 'discounts') {
+                          void loadDiscountCodes();
                         } else {
                           void loadInsights();
                         }
                       }}
                       className="secondary-button w-full justify-center"
-                      disabled={activeView === 'orders' ? checkoutOrdersLoading : insightsLoading}
+                      disabled={activeView === 'orders' ? checkoutOrdersLoading : activeView === 'discounts' ? discountCodesLoading : insightsLoading}
                     >
-                      {(activeView === 'orders' ? checkoutOrdersLoading : insightsLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {(activeView === 'orders' ? checkoutOrdersLoading : activeView === 'discounts' ? discountCodesLoading : insightsLoading) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                       {insightsUi.refresh}
                     </button>
                     <button type="button" onClick={handleLogout} className="secondary-button w-full justify-center">
@@ -1356,6 +1526,18 @@ export default function AtelierVaultPage({
                     className={activeView === 'orders' ? 'primary-button' : 'secondary-button'}
                   >
                     {insightsUi.ordersTab}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveView('discounts');
+                      if (!discountCodesLoading) {
+                        void loadDiscountCodes();
+                      }
+                    }}
+                    className={activeView === 'discounts' ? 'primary-button' : 'secondary-button'}
+                  >
+                    {insightsUi.discountsTab}
                   </button>
                 </div>
               ) : null}
@@ -1420,6 +1602,11 @@ export default function AtelierVaultPage({
                                   <div className="space-y-2">
                                     <h3 className="text-xl font-semibold tracking-[-0.02em] text-[color:var(--text-primary)] md:text-2xl">{localized(language, design.name)}</h3>
                                     <p className="text-sm text-[color:var(--text-muted)]">{localized(language, design.subtitle)}</p>
+                                    {design.price ? (
+                                      <p className="text-sm font-semibold text-[color:var(--text-primary)]">
+                                        {formatPrice(design.price, getPriceLocale(language))}
+                                      </p>
+                                    ) : null}
                                     <p className="line-clamp-2 text-sm leading-7 text-[color:var(--text-muted)]">{localized(language, design.description)}</p>
                                   </div>
                                   <div className="flex flex-wrap gap-2">
@@ -1450,8 +1637,10 @@ export default function AtelierVaultPage({
                   </section>
                 ) : activeView === 'insights' ? (
                   insightsView
-                ) : (
+                ) : activeView === 'orders' ? (
                   checkoutOrdersView
+                ) : (
+                  discountCodesView
                 )}
               </>
             )}
@@ -1560,6 +1749,15 @@ export default function AtelierVaultPage({
                       </Field>
                       <Field label={ui.descriptionAr} span>
                         <textarea value={formState.descriptionAr} onChange={(event) => setFormState((current) => ({ ...current, descriptionAr: event.target.value }))} rows={4} className="field-input min-h-[9rem] resize-y" />
+                      </Field>
+                      <Field label={ui.price}>
+                        <input
+                          value={formState.price}
+                          onChange={(event) => setFormState((current) => ({ ...current, price: event.target.value }))}
+                          className="field-input"
+                          inputMode="decimal"
+                          placeholder={ui.pricePlaceholder}
+                        />
                       </Field>
                     </section>
 
