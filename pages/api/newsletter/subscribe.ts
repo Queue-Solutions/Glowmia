@@ -29,7 +29,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
       source: 'newsletter',
     });
 
-    if (result.created) {
+    if (result.created || result.resubscribed) {
       await trackEmailEvent({
         email,
         eventType: 'subscribed',
@@ -41,8 +41,8 @@ export default async function handler(request: NextApiRequest, response: NextApi
 
     response.status(result.created ? 201 : 200).json({
       ok: true,
-      alreadySubscribed: !result.created,
-      message: result.created
+      alreadySubscribed: !result.created && !result.resubscribed,
+      message: result.created || result.resubscribed
         ? 'You are now subscribed to Glowmia updates.'
         : 'You are already subscribed to Glowmia updates.',
     });

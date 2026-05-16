@@ -1,5 +1,5 @@
-import { Resend } from 'resend';
 import { sendOrderConfirmationEmail } from '@/src/lib/newsletter';
+import { sendEmail as sendTransactionalEmail } from '@/src/lib/sendEmail';
 
 type TeamOrderNotificationInput = {
   orderId: string;
@@ -24,35 +24,23 @@ function readEnv(value: string | undefined) {
   return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
-function getEmailApiKey() {
-  return readEnv(process.env.EMAIL_API_KEY) || readEnv(process.env.RESEND_API_KEY);
-}
-
-function getEmailFrom() {
-  return readEnv(process.env.EMAIL_FROM) || readEnv(process.env.NEWSLETTER_FROM_EMAIL);
-}
-
 function getEmailTo() {
   return (
     readEnv(process.env.EMAIL_TO) ||
     readEnv(process.env.CHECKOUT_EMAIL_TO) ||
     readEnv(process.env.GLOWMIA_CONTACT_EMAIL) ||
-    'glowmia.sa@hotmail.com'
+    'glowmiasa@hotmail.com'
   );
 }
 
 export function getTransactionalEmailConfig() {
-  const apiKey = getEmailApiKey();
-  const from = getEmailFrom();
   const to = getEmailTo();
 
-  if (!apiKey || !from || !to) {
+  if (!to) {
     return null;
   }
 
   return {
-    resend: new Resend(apiKey),
-    from,
     to,
   };
 }
@@ -61,7 +49,7 @@ export async function sendTeamOrderNotification(input: TeamOrderNotificationInpu
   const config = getTransactionalEmailConfig();
 
   if (!config) {
-    console.warn('[orders.create] Team order notification skipped because EMAIL_API_KEY/EMAIL_FROM/EMAIL_TO are not fully configured.');
+    console.warn('[orders.create] Team order notification skipped because no destination inbox is configured.');
     return { skipped: true };
   }
 
@@ -72,19 +60,10 @@ export async function sendTeamOrderNotification(input: TeamOrderNotificationInpu
     )
     .join('');
 
-  const itemsText = input.items
-    .map(
-      (item) =>
-        `${item.designName} (${item.designId})${item.size ? ` - Size: ${item.size}` : ''} - Qty: ${item.quantity}${item.color ? ` - Color: ${item.color}` : ''}`,
-    )
-    .join('\n');
-
   const subject = `New Glowmia Order ${input.orderId}`;
 
-  const { error } = await config.resend.emails.send({
-    from: config.from,
+  await sendTransactionalEmail({
     to: config.to,
-    replyTo: input.customer.email || getEmailTo(),
     subject,
     html: `
       <div>
@@ -100,24 +79,9 @@ export async function sendTeamOrderNotification(input: TeamOrderNotificationInpu
         <ul>${itemsHtml}</ul>
       </div>
     `,
-    text: [
-      `New Glowmia order`,
-      `Order ID: ${input.orderId}`,
-      `Name: ${input.customer.name}`,
-      `Phone: ${input.customer.phone}`,
-      `Email: ${input.customer.email || 'N/A'}`,
-      `Address: ${input.customer.address}`,
-      `City: ${input.customer.city}`,
-      `Notes: ${input.notes || 'N/A'}`,
-      ``,
-      `Items:`,
-      itemsText,
-    ].join('\n'),
+    tag: 'team-order-notification',
+    logContext: 'orders.team-notification',
   });
-
-  if (error) {
-    throw new Error(error.message || 'Unable to send team order notification.');
-  }
 
   return { skipped: false };
 }

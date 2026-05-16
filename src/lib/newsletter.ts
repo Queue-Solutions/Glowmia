@@ -1,14 +1,19 @@
 ﻿import type { NextApiRequest } from 'next';
-import { Resend } from 'resend';
+import { randomUUID } from 'crypto';
 import { getSupabaseAdminClient } from '@/src/lib/adminSupabase';
+import { sendEmail as sendTransactionalEmail } from '@/src/lib/sendEmail';
 
 const NEWSLETTER_TABLE = 'newsletter_subscribers';
 const ABANDONED_CARTS_TABLE = 'abandoned_carts';
 const EMAIL_EVENTS_TABLE = 'email_events';
 const DEFAULT_SITE_URL = 'https://glowmia.vercel.app';
-const DEFAULT_CONTACT_EMAIL = 'glowmia.sa@hotmail.com';
+const DEFAULT_CONTACT_EMAIL = 'glowmiasa@hotmail.com';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CART_REMINDER_COOLDOWN_HOURS = 48;
+const UNSUBSCRIBE_TOKEN_KEY = 'unsubscribe_token';
+const UNSUBSCRIBED_AT_KEY = 'unsubscribed_at';
+const UNSUBSCRIBED_VIA_KEY = 'unsubscribed_via';
+const RESUBSCRIBED_AT_KEY = 'resubscribed_at';
 
 const NEWSLETTER_SUBSCRIBER_FIELDS = ['id', 'email', 'source', 'created_at', 'last_seen_at', 'metadata'] as const;
 const ABANDONED_CART_FIELDS = ['id', 'email', 'items', 'created_at', 'last_reminder_sent_at', 'last_seen_at', 'metadata'] as const;
@@ -25,6 +30,7 @@ export type CaptureSource =
 
 export type EmailEventType =
   | 'subscribed'
+  | 'unsubscribed'
   | 'order_created'
   | 'design_created'
   | 'design_saved'
@@ -70,7 +76,6 @@ type AbandonedCartRow = {
 };
 
 type AdminSupabaseClient = NonNullable<ReturnType<typeof getSupabaseAdminClient>>;
-type NewsletterSender = NonNullable<ReturnType<typeof getNewsletterSender>>;
 type ColumnCacheEntry = Promise<Set<string>>;
 
 const tableColumnCache = new Map<string, ColumnCacheEntry>();
@@ -118,6 +123,30 @@ function mergeMetadata(base: unknown, extra?: JsonObject | null) {
     ...normalizeJsonObject(base),
     ...(extra ?? {}),
   };
+}
+
+function getMetadataString(metadata: unknown, key: string) {
+  return normalizeNullableString(normalizeJsonObject(metadata)[key]);
+}
+
+function isUnsubscribedMetadata(metadata: unknown) {
+  const normalized = normalizeJsonObject(metadata);
+
+  if (normalized.unsubscribed === true) {
+    return true;
+  }
+
+  return Boolean(getMetadataString(metadata, UNSUBSCRIBED_AT_KEY));
+}
+
+function omitMetadataKeys(metadata: JsonObject, keys: string[]) {
+  const nextMetadata = { ...metadata };
+
+  for (const key of keys) {
+    delete nextMetadata[key];
+  }
+
+  return nextMetadata;
 }
 
 export function isDuplicateNewsletterError(error: unknown) {
@@ -217,6 +246,24 @@ async function findSubscriberByEmail(email: string, columns: Set<string>) {
   }
 
   const { data, error } = await query;
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load newsletter subscriber.');
+  }
+
+  const rows = (data as NewsletterSubscriberRow[] | null) ?? [];
+  return rows[0] ?? null;
+}
+
+async function findSubscriberById(subscriberId: string, columns: Set<string>) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    throw new Error('Supabase admin client is not configured.');
+  }
+
+  const select = buildSelect(columns, NEWSLETTER_SUBSCRIBER_FIELDS);
+  const { data, error } = await getTable(supabase, NEWSLETTER_TABLE).select(select).eq('id', subscriberId).limit(1);
 
   if (error) {
     throw new Error(error.message || 'Unable to load newsletter subscriber.');
@@ -361,25 +408,6 @@ export function getNewsletterAdminClient() {
   return getSupabaseAdminClient();
 }
 
-export function getNewsletterSender() {
-  const apiKey = process.env.RESEND_API_KEY?.trim() || '';
-  const fromInput = process.env.NEWSLETTER_FROM_EMAIL?.trim() || '';
-
-  if (!apiKey || !fromInput) {
-    return null;
-  }
-
-  const from = fromInput.includes('<') ? fromInput : `Glowmia <${fromInput}>`;
-  const fromEmailMatch = from.match(/<([^>]+)>/);
-  const fromEmail = (fromEmailMatch?.[1] || fromInput).trim();
-
-  return {
-    resend: new Resend(apiKey),
-    from,
-    fromEmail,
-  };
-}
-
 function getGlowmiaContactEmail() {
   const configured =
     process.env.GLOWMIA_CONTACT_EMAIL?.trim() ||
@@ -393,6 +421,7 @@ export async function upsertNewsletterSubscriber(input: {
   email: string;
   source: CaptureSource;
   metadata?: JsonObject | null;
+  allowResubscribe?: boolean;
 }) {
   const supabase = getSupabaseAdminClient();
 
@@ -409,6 +438,8 @@ export async function upsertNewsletterSubscriber(input: {
 
   const now = new Date().toISOString();
   const existing = await findSubscriberByEmail(normalizedEmail, columns);
+  const existingMetadata = normalizeJsonObject(existing?.metadata);
+  const wasUnsubscribed = isUnsubscribedMetadata(existingMetadata);
   const payload: Record<string, unknown> = {
     email: normalizedEmail,
   };
@@ -422,11 +453,21 @@ export async function upsertNewsletterSubscriber(input: {
   }
 
   if (columns.has('metadata')) {
-    payload.metadata = mergeMetadata(existing?.metadata, {
+    const nextMetadata = mergeMetadata(existing?.metadata, {
       ...(input.metadata ?? {}),
       latest_source: input.source,
       last_seen_at: now,
     });
+
+    if (input.allowResubscribe) {
+      const resubscribedMetadata = omitMetadataKeys(nextMetadata, [UNSUBSCRIBED_AT_KEY, UNSUBSCRIBED_VIA_KEY]);
+      payload.metadata = {
+        ...resubscribedMetadata,
+        [RESUBSCRIBED_AT_KEY]: now,
+      };
+    } else {
+      payload.metadata = nextMetadata;
+    }
   }
 
   if (existing?.id && columns.has('id')) {
@@ -436,7 +477,12 @@ export async function upsertNewsletterSubscriber(input: {
       throw error;
     }
 
-    return { created: false, subscriberId: existing.id, email: normalizedEmail };
+    return {
+      created: false,
+      subscriberId: existing.id,
+      email: normalizedEmail,
+      resubscribed: Boolean(input.allowResubscribe && wasUnsubscribed),
+    };
   }
 
   const { data, error } = await getTable(supabase, NEWSLETTER_TABLE).insert(payload).select(columns.has('id') ? 'id' : 'email').limit(1);
@@ -446,7 +492,12 @@ export async function upsertNewsletterSubscriber(input: {
   }
 
   const row = Array.isArray(data) ? (data[0] as { id?: string } | undefined) : undefined;
-  return { created: true, subscriberId: row?.id || null, email: normalizedEmail };
+  return {
+    created: true,
+    subscriberId: row?.id || null,
+    email: normalizedEmail,
+    resubscribed: false,
+  };
 }
 
 export async function captureNewsletterEmail(input: {
@@ -465,6 +516,7 @@ export async function captureNewsletterEmail(input: {
     email: normalizedEmail,
     source: input.source,
     metadata: input.metadata ?? null,
+    allowResubscribe: input.source === 'newsletter',
   });
 
   let abandonedCart: { created: boolean } | null = null;
@@ -492,6 +544,7 @@ export async function captureNewsletterEmail(input: {
     ok: true,
     email: normalizedEmail,
     created: subscriber.created,
+    resubscribed: subscriber.resubscribed,
     abandonedCartCreated: abandonedCart?.created ?? false,
   };
 }
@@ -610,6 +663,7 @@ export async function listRemindableAbandonedCarts() {
 
   const cooldownMs = CART_REMINDER_COOLDOWN_HOURS * 60 * 60 * 1000;
   const now = Date.now();
+  const unsubscribedEmails = await listUnsubscribedNewsletterEmailSet();
 
   return ((data as AbandonedCartRow[] | null) ?? [])
     .map((row) => ({
@@ -619,7 +673,7 @@ export async function listRemindableAbandonedCarts() {
       createdAt: normalizeNullableString(row.created_at),
       lastReminderSentAt: normalizeNullableString(row.last_reminder_sent_at),
     }))
-    .filter((row) => row.email && row.items.length > 0)
+    .filter((row) => row.email && row.items.length > 0 && !unsubscribedEmails.has(row.email))
     .filter((row) => {
       if (!row.lastReminderSentAt) {
         return true;
@@ -695,47 +749,159 @@ export async function trackEmailEvent(input: {
   return { ok: true };
 }
 
-export async function listNewsletterSubscribers(): Promise<string[]> {
+async function listNewsletterSubscriberRows() {
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
     throw new Error('Supabase admin client is not configured.');
   }
 
-  const { data, error } = await getTable(supabase, NEWSLETTER_TABLE).select('email').not('email', 'is', null);
+  const columns = await getAvailableColumns(NEWSLETTER_TABLE, NEWSLETTER_SUBSCRIBER_FIELDS);
+  const select = buildSelect(columns, NEWSLETTER_SUBSCRIBER_FIELDS);
+  const { data, error } = await getTable(supabase, NEWSLETTER_TABLE).select(select).not('email', 'is', null);
 
   if (error) {
     throw new Error(error.message || 'Unable to load newsletter subscribers.');
   }
 
-  return ((data as Array<{ email: string | null }> | null) ?? [])
-    .map((entry) => normalizeNewsletterEmail(entry.email))
-    .filter(Boolean);
+  return ((data as NewsletterSubscriberRow[] | null) ?? [])
+    .map((entry) => ({
+      id: normalizeNullableString(entry.id),
+      email: normalizeNewsletterEmail(entry.email),
+      metadata: normalizeJsonObject(entry.metadata),
+    }))
+    .filter((entry) => entry.email);
 }
 
-function getUnsubscribeHref(contactEmail: string) {
-  return `mailto:${contactEmail}?subject=${encodeURIComponent('Ø¥Ù„ØºØ§Ø¡ Ø§Ø´ØªØ±Ø§Ùƒ Glowmia')}`;
+async function listUnsubscribedNewsletterEmailSet() {
+  const rows = await listNewsletterSubscriberRows();
+
+  return new Set(rows.filter((row) => isUnsubscribedMetadata(row.metadata)).map((row) => row.email));
 }
 
-async function sendEmail(input: {
-  sender: NewsletterSender;
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-}) {
-  const { error } = await input.sender.resend.emails.send({
-    from: input.sender.from,
-    to: input.to,
-    replyTo: getGlowmiaContactEmail(),
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
+export async function listNewsletterSubscribers(): Promise<string[]> {
+  const rows = await listNewsletterSubscriberRows();
+  const seenEmails = new Set<string>();
+  const recipients: string[] = [];
+
+  for (const row of rows) {
+    if (isUnsubscribedMetadata(row.metadata) || seenEmails.has(row.email)) {
+      continue;
+    }
+
+    seenEmails.add(row.email);
+    recipients.push(row.email);
+  }
+
+  return recipients;
+}
+
+function buildUnsubscribeHref(subscriberId: string, token: string) {
+  const url = new URL('/api/newsletter/unsubscribe', getNewsletterSiteUrl());
+  url.searchParams.set('subscriber', subscriberId);
+  url.searchParams.set('token', token);
+  return url.toString();
+}
+
+async function getOrCreateUnsubscribeHref(email: string) {
+  const columns = await getAvailableColumns(NEWSLETTER_TABLE, NEWSLETTER_SUBSCRIBER_FIELDS);
+  const subscriber = await findSubscriberByEmail(normalizeNewsletterEmail(email), columns);
+
+  if (!subscriber?.id || !columns.has('id') || !columns.has('metadata')) {
+    return `mailto:${getGlowmiaContactEmail()}?subject=${encodeURIComponent('Ø¥Ù„ØºØ§Ø¡ Ø§Ø´ØªØ±Ø§Ùƒ Glowmia')}`;
+  }
+
+  const existingMetadata = normalizeJsonObject(subscriber.metadata);
+  const existingToken = getMetadataString(existingMetadata, UNSUBSCRIBE_TOKEN_KEY);
+
+  if (existingToken) {
+    return buildUnsubscribeHref(subscriber.id, existingToken);
+  }
+
+  const unsubscribeToken = randomUUID();
+  const nextMetadata = mergeMetadata(existingMetadata, {
+    [UNSUBSCRIBE_TOKEN_KEY]: unsubscribeToken,
   });
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    throw new Error('Supabase admin client is not configured.');
+  }
+
+  const { error } = await getTable(supabase, NEWSLETTER_TABLE).update({ metadata: nextMetadata }).eq('id', subscriber.id);
 
   if (error) {
-    throw new Error(error.message || 'Unable to send email.');
+    throw new Error(error.message || 'Unable to prepare the unsubscribe link.');
   }
+
+  return buildUnsubscribeHref(subscriber.id, unsubscribeToken);
+}
+
+export async function unsubscribeNewsletterSubscriber(input: { subscriberId: string; token: string }) {
+  const normalizedSubscriberId = normalizeString(input.subscriberId);
+  const normalizedToken = normalizeString(input.token);
+
+  if (!normalizedSubscriberId || !normalizedToken) {
+    return { ok: false as const, reason: 'invalid_request' as const };
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    throw new Error('Supabase admin client is not configured.');
+  }
+
+  const columns = await getAvailableColumns(NEWSLETTER_TABLE, NEWSLETTER_SUBSCRIBER_FIELDS);
+
+  if (!columns.has('id') || !columns.has('metadata')) {
+    throw new Error('Newsletter unsubscribe is not available because subscriber metadata is not configured.');
+  }
+
+  const subscriber = await findSubscriberById(normalizedSubscriberId, columns);
+
+  if (!subscriber?.id || !subscriber.email) {
+    return { ok: false as const, reason: 'not_found' as const };
+  }
+
+  const existingToken = getMetadataString(subscriber.metadata, UNSUBSCRIBE_TOKEN_KEY);
+
+  if (!existingToken || existingToken !== normalizedToken) {
+    return { ok: false as const, reason: 'invalid_token' as const };
+  }
+
+  const normalizedEmail = normalizeNewsletterEmail(subscriber.email);
+
+  if (isUnsubscribedMetadata(subscriber.metadata)) {
+    return {
+      ok: true as const,
+      email: normalizedEmail,
+      alreadyUnsubscribed: true,
+    };
+  }
+
+  const metadata = mergeMetadata(subscriber.metadata, {
+    [UNSUBSCRIBED_AT_KEY]: new Date().toISOString(),
+    [UNSUBSCRIBED_VIA_KEY]: 'link',
+  });
+  const { error } = await getTable(supabase, NEWSLETTER_TABLE).update({ metadata }).eq('id', subscriber.id);
+
+  if (error) {
+    throw new Error(error.message || 'Unable to update the newsletter subscription.');
+  }
+
+  await trackEmailEvent({
+    email: normalizedEmail,
+    eventType: 'unsubscribed',
+    metadata: {
+      source: 'unsubscribe_link',
+    },
+  });
+
+  return {
+    ok: true as const,
+    email: normalizedEmail,
+    alreadyUnsubscribed: false,
+  };
 }
 
 export function buildWeeklyEmail(siteUrl: string, unsubscribeHref: string): WeeklyEmailContent {
@@ -880,19 +1046,13 @@ export function buildDesignConfirmationEmail(input: {
 }
 
 export async function sendWeeklyNewsletterEmail(email: string) {
-  const sender = getNewsletterSender();
-
-  if (!sender) {
-    throw new Error('Newsletter email is not configured. Add RESEND_API_KEY and NEWSLETTER_FROM_EMAIL.');
-  }
-
-  const content = buildWeeklyEmail(getNewsletterSiteUrl(), getUnsubscribeHref(getGlowmiaContactEmail()));
-  await sendEmail({
-    sender,
+  const content = buildWeeklyEmail(getNewsletterSiteUrl(), await getOrCreateUnsubscribeHref(email));
+  await sendTransactionalEmail({
     to: email,
     subject: content.subject,
     html: content.html,
-    text: content.text,
+    tag: 'newsletter-weekly',
+    logContext: 'newsletter.weekly',
   });
 
   await trackEmailEvent({
@@ -907,23 +1067,17 @@ export async function sendWeeklyNewsletterEmail(email: string) {
 }
 
 export async function sendCartReminderEmail(input: { email: string; items: MailingCartItem[] }) {
-  const sender = getNewsletterSender();
-
-  if (!sender) {
-    throw new Error('Newsletter email is not configured. Add RESEND_API_KEY and NEWSLETTER_FROM_EMAIL.');
-  }
-
   const content = buildCartReminderEmail({
     siteUrl: getNewsletterSiteUrl(),
-    unsubscribeHref: getUnsubscribeHref(getGlowmiaContactEmail()),
+    unsubscribeHref: await getOrCreateUnsubscribeHref(input.email),
     items: input.items,
   });
-  await sendEmail({
-    sender,
+  await sendTransactionalEmail({
     to: input.email,
     subject: content.subject,
     html: content.html,
-    text: content.text,
+    tag: 'cart-reminder',
+    logContext: 'newsletter.cart-reminder',
   });
 
   await trackEmailEvent({
@@ -943,25 +1097,19 @@ export async function sendOrderConfirmationEmail(input: {
   orderId: string;
   items: MailingCartItem[];
 }) {
-  const sender = getNewsletterSender();
-
-  if (!sender) {
-    throw new Error('Newsletter email is not configured. Add RESEND_API_KEY and NEWSLETTER_FROM_EMAIL.');
-  }
-
   const content = buildOrderConfirmationEmail({
     siteUrl: getNewsletterSiteUrl(),
-    unsubscribeHref: getUnsubscribeHref(getGlowmiaContactEmail()),
+    unsubscribeHref: await getOrCreateUnsubscribeHref(input.email),
     customerName: input.customerName,
     orderId: input.orderId,
     items: input.items,
   });
-  await sendEmail({
-    sender,
+  await sendTransactionalEmail({
     to: input.email,
     subject: content.subject,
     html: content.html,
-    text: content.text,
+    tag: 'order-confirmation',
+    logContext: 'orders.customer-confirmation',
   });
 
   return { ok: true };
@@ -973,25 +1121,19 @@ export async function sendDesignConfirmationEmail(input: {
   imageUrl?: string | null;
   prompt?: string | null;
 }) {
-  const sender = getNewsletterSender();
-
-  if (!sender) {
-    throw new Error('Newsletter email is not configured. Add RESEND_API_KEY and NEWSLETTER_FROM_EMAIL.');
-  }
-
   const content = buildDesignConfirmationEmail({
     siteUrl: getNewsletterSiteUrl(),
-    unsubscribeHref: getUnsubscribeHref(getGlowmiaContactEmail()),
+    unsubscribeHref: await getOrCreateUnsubscribeHref(input.email),
     dressName: input.dressName,
     imageUrl: input.imageUrl,
     prompt: input.prompt,
   });
-  await sendEmail({
-    sender,
+  await sendTransactionalEmail({
     to: input.email,
     subject: content.subject,
     html: content.html,
-    text: content.text,
+    tag: 'design-confirmation',
+    logContext: 'designs.confirmation',
   });
 
   return { ok: true };

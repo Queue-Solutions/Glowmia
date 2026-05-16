@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { assertEmailConfiguration, isEmailConfigurationError, maskEmailForLogs } from '@/src/lib/sendEmail';
 import {
   isCronAuthorized,
   listRemindableAbandonedCarts,
@@ -10,6 +11,13 @@ type SendFailure = {
   email: string;
   error: string;
 };
+
+const CART_REMINDER_BATCH_SIZE = 10;
+const CART_REMINDER_BATCH_DELAY_MS = 500;
+
+function wait(delayMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
 
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
@@ -26,6 +34,8 @@ export default async function handler(request: NextApiRequest, response: NextApi
   }
 
   try {
+    assertEmailConfiguration();
+
     const carts = await listRemindableAbandonedCarts();
 
     if (carts.length === 0) {
@@ -42,23 +52,35 @@ export default async function handler(request: NextApiRequest, response: NextApi
     const failures: SendFailure[] = [];
     let sentCount = 0;
 
-    for (const cart of carts) {
-      try {
-        await sendCartReminderEmail({
-          email: cart.email,
-          items: cart.items,
-        });
+    for (let index = 0; index < carts.length; index += CART_REMINDER_BATCH_SIZE) {
+      const batch = carts.slice(index, index + CART_REMINDER_BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (cart) => {
+          await sendCartReminderEmail({
+            email: cart.email,
+            items: cart.items,
+          });
 
-        if (cart.id) {
-          await markCartReminderSent(cart.id);
+          if (cart.id) {
+            await markCartReminderSent(cart.id);
+          }
+        }),
+      );
+
+      results.forEach((result, batchIndex) => {
+        if (result.status === 'fulfilled') {
+          sentCount += 1;
+          return;
         }
 
-        sentCount += 1;
-      } catch (error) {
         failures.push({
-          email: cart.email,
-          error: error instanceof Error ? error.message : 'Unable to send cart reminder.',
+          email: maskEmailForLogs(batch[batchIndex]?.email || ''),
+          error: result.reason instanceof Error ? result.reason.message : 'Unable to send cart reminder.',
         });
+      });
+
+      if (index + CART_REMINDER_BATCH_SIZE < carts.length) {
+        await wait(CART_REMINDER_BATCH_DELAY_MS);
       }
     }
 
@@ -75,6 +97,14 @@ export default async function handler(request: NextApiRequest, response: NextApi
     });
   } catch (error) {
     console.error('[Newsletter Cart Reminders]', error);
+    if (isEmailConfigurationError(error)) {
+      response.status(500).json({
+        ok: false,
+        error: error.message,
+      });
+      return;
+    }
+
     response.status(500).json({
       ok: false,
       error: 'Unable to send cart reminders right now.',
