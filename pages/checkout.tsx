@@ -26,7 +26,6 @@ import { calculateDiscountAmount, formatPrice, getPriceLocale } from '@/src/lib/
 
 type CheckoutPageProps = {
   designs: Design[];
-  checkoutEmailTo: string;
 };
 
 type CheckoutResponse = {
@@ -65,13 +64,7 @@ type DisplayCheckoutItem =
       lineTotal: number;
     };
 
-const FORM_SUBMIT_FRAME = 'glowmia-formsubmit-frame';
 const SUCCESS_REDIRECT_DELAY_MS = 500;
-const DEFAULT_CHECKOUT_EMAIL = 'glowmia.sa@hotmail.com';
-
-function joinOrderFieldValues(values: Array<string | null | undefined>) {
-  return values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)).join('\n');
-}
 
 export const getStaticProps: GetStaticProps<CheckoutPageProps> = async () => {
   const designs = await getAllDesignsFromSupabase();
@@ -79,13 +72,12 @@ export const getStaticProps: GetStaticProps<CheckoutPageProps> = async () => {
   return {
     props: {
       designs,
-      checkoutEmailTo: process.env.CHECKOUT_EMAIL_TO?.trim() || DEFAULT_CHECKOUT_EMAIL,
     },
     revalidate: 60,
   };
 };
 
-export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStaticPropsType<typeof getStaticProps>) {
+export default function CheckoutPage({ designs }: InferGetStaticPropsType<typeof getStaticProps>) {
   const router = useRouter();
   const { language } = useSitePreferencesContext();
   const { entries, hydrated, clearCart } = useCartContext();
@@ -340,76 +332,6 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
     }
   };
 
-  const submitOrderEmail = (fullPhone: string) => {
-    if (typeof document === 'undefined') {
-      throw new Error('Form submission is only available in the browser.');
-    }
-
-    let iframe = document.querySelector(`iframe[name="${FORM_SUBMIT_FRAME}"]`) as HTMLIFrameElement | null;
-
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.name = FORM_SUBMIT_FRAME;
-      iframe.title = FORM_SUBMIT_FRAME;
-      iframe.setAttribute('aria-hidden', 'true');
-      iframe.tabIndex = -1;
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-    }
-
-    const form = document.createElement('form');
-    form.action = `https://formsubmit.co/${encodeURIComponent(checkoutEmailTo || DEFAULT_CHECKOUT_EMAIL)}`;
-    form.method = 'POST';
-    form.target = FORM_SUBMIT_FRAME;
-    form.style.display = 'none';
-
-    const fields = {
-      customer_name: formState.name,
-      phone: fullPhone,
-      customer_email: normalizeClientEmail(formState.email),
-      address: formState.address,
-      city: formState.city,
-      dress_id: joinOrderFieldValues(
-        displayItems.map((item) => {
-          if (item.kind === 'saved') {
-            return item.savedDesign.dressId;
-          }
-
-          return item.design.id;
-        }),
-      ),
-      dress_name: joinOrderFieldValues(displayItems.map((item) => item.designName)),
-      size: joinOrderFieldValues(displayItems.map((item) => item.size || 'custom')),
-      quantity: joinOrderFieldValues(displayItems.map((item) => String(item.quantity))),
-      unit_price: joinOrderFieldValues(displayItems.map((item) => formatPrice(item.unitPrice, 'en-SA') || '0')),
-      line_total: joinOrderFieldValues(displayItems.map((item) => formatPrice(item.lineTotal, 'en-SA') || '0')),
-      subtotal: formatPrice(subtotal, 'en-SA') || '',
-      discount_code: appliedDiscount?.code || '',
-      discount_amount: appliedDiscount ? formatPrice(discountAmount, 'en-SA') : '',
-      order_total: formatPrice(total, 'en-SA') || '',
-      notes: formState.notes,
-      edited_image_url: savedDesign?.editedImageUrl || '',
-      saved_design_id: savedDesign?.id || '',
-      _subject: 'New Glowmia Order',
-      _template: 'table',
-    };
-
-    Object.entries(fields).forEach(([key, value]) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = key;
-      input.value = value || '';
-      form.appendChild(input);
-    });
-
-    document.body.appendChild(form);
-    form.submit();
-
-    window.setTimeout(() => {
-      form.remove();
-    }, 1000);
-  };
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -459,12 +381,6 @@ export default function CheckoutPage({ designs, checkoutEmailTo }: InferGetStati
 
       if (!response.ok || !data.ok) {
         throw new Error(data.error || copyFor(language, glowmiaCopy.checkout.requiredError));
-      }
-
-      try {
-        submitOrderEmail(fullPhone);
-      } catch (emailError) {
-        console.error('Glowmia order email failed:', emailError instanceof Error ? emailError.message : 'Unable to submit the order email.');
       }
 
       setOrderId(data.orderId || '');

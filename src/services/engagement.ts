@@ -98,12 +98,14 @@ export type CheckoutOrderEntry = {
 };
 
 export type DiscountCodeEntry = {
+  id: string;
   code: string;
   percentage: number;
+  isActive: boolean;
+  usageLimit: number | null;
+  usedCount: number;
+  expiresAt: string | null;
   createdAt: string;
-  redeemedAt: string | null;
-  redeemedOrderId: string | null;
-  redeemedCustomerName: string | null;
 };
 
 export type AppliedDiscount = {
@@ -112,9 +114,9 @@ export type AppliedDiscount = {
   amount: number;
 };
 
-async function postJson<T>(url: string, body: unknown) {
+async function sendJson<T>(url: string, body: unknown, method = 'POST') {
   const response = await fetch(url, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -145,12 +147,12 @@ export async function submitDesignFeedback(input: {
   message: string;
   rating: number;
 }) {
-  const payload = await postJson<{ comment: DesignFeedbackEntry }>('/api/engagement/design-feedback', input);
+  const payload = await sendJson<{ comment: DesignFeedbackEntry }>('/api/engagement/design-feedback', input);
   return payload.comment;
 }
 
 export async function syncDesignLike(input: { designId: string; clientId: string; liked: boolean }) {
-  const payload = await postJson<{ count: number }>('/api/engagement/design-like', input);
+  const payload = await sendJson<{ count: number }>('/api/engagement/design-like', input);
   return payload.count;
 }
 
@@ -160,7 +162,7 @@ export async function submitAgentFeedback(input: {
   rating: number;
   message: string;
 }) {
-  const payload = await postJson<{ feedback: AgentFeedbackEntry }>('/api/engagement/agent-feedback', input);
+  const payload = await sendJson<{ feedback: AgentFeedbackEntry }>('/api/engagement/agent-feedback', input);
   return payload.feedback;
 }
 
@@ -178,7 +180,7 @@ export async function submitSavedDesignOrder(input: {
   editedImageUrl: string;
   prompt?: string;
 }) {
-  const payload = await postJson<{ savedDesign: SavedDesignEntry }>('/api/engagement/agent-design-order', input);
+  const payload = await sendJson<{ savedDesign: SavedDesignEntry }>('/api/engagement/agent-design-order', input);
   return payload.savedDesign;
 }
 
@@ -257,12 +259,30 @@ export async function fetchAdminDiscountCodes() {
   return payload.codes ?? [];
 }
 
-export async function generateAdminDiscountCode(percentage: number) {
-  const payload = await postJson<{ code: DiscountCodeEntry }>('/api/admin/discount-codes', { percentage });
+export async function createAdminDiscountCode(input: {
+  code: string;
+  percentage: number;
+  isActive: boolean;
+  usageLimit?: number | null;
+  expiresAt?: string | null;
+}) {
+  const payload = await sendJson<{ code: DiscountCodeEntry }>('/api/admin/discount-codes', input);
+  return payload.code;
+}
+
+export async function updateAdminDiscountCode(input: {
+  id: string;
+  code: string;
+  percentage: number;
+  isActive: boolean;
+  usageLimit?: number | null;
+  expiresAt?: string | null;
+}) {
+  const payload = await sendJson<{ code: DiscountCodeEntry }>('/api/admin/discount-codes', input, 'PATCH');
   return payload.code;
 }
 
 export async function validateBuyerDiscountCode(input: { code: string; subtotal: number }) {
-  const payload = await postJson<{ discount: AppliedDiscount }>('/api/discount-code', input);
+  const payload = await sendJson<{ discount: AppliedDiscount }>('/api/coupons/validate', input);
   return payload.discount;
 }

@@ -86,13 +86,32 @@ export function assertEmailConfiguration() {
   getBrevoApiKey();
 }
 
+function ensureUtf8HtmlDocument(html: string) {
+  const trimmedHtml = html.trim();
+
+  if (/<!doctype html>/i.test(trimmedHtml) && /<meta[^>]+charset=/i.test(trimmedHtml)) {
+    return trimmedHtml;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>${trimmedHtml}</body>
+</html>`;
+}
+
 export async function sendEmail(input: SendEmailInput) {
   const apiKey = getBrevoApiKey();
+  const htmlContent = ensureUtf8HtmlDocument(input.html);
   const response = await fetch(BREVO_TRANSACTIONAL_EMAIL_URL, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
       'api-key': apiKey,
     },
     body: JSON.stringify({
@@ -106,7 +125,11 @@ export async function sendEmail(input: SendEmailInput) {
         email: DEFAULT_REPLY_TO_EMAIL,
       },
       subject: input.subject,
-      htmlContent: input.html,
+      htmlContent,
+      headers: {
+        charset: 'utf-8',
+        'Content-Type': 'text/html; charset=utf-8',
+      },
       ...(input.tag ? { tags: [input.tag] } : {}),
     }),
   });

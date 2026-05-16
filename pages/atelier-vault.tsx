@@ -10,13 +10,14 @@ import { getAdminUsernameFromRequest, isAdminConfigured } from '@/src/lib/adminA
 import { useSitePreferencesContext } from '@/src/context/SitePreferencesContext';
 import type { Language } from '@/src/content/glowmia';
 import {
+  createAdminDiscountCode,
   fetchAdminCheckoutOrders,
   fetchAdminDiscountCodes,
   fetchAdminInsights,
-  generateAdminDiscountCode,
   type AdminInsights,
   type CheckoutOrderEntry,
   type DiscountCodeEntry,
+  updateAdminDiscountCode,
 } from '@/src/services/engagement';
 import { formatPrice, getPriceLocale } from '@/src/lib/pricing';
 
@@ -24,8 +25,22 @@ type AdminPageProps = { configured: boolean; authenticated: boolean; designs: De
 type EditorMode = 'create' | 'edit' | null;
 type OptionItem = { value: string; en: string; ar: string };
 type AdminView = 'catalog' | 'insights' | 'orders' | 'discounts';
+type CouponFormState = {
+  code: string;
+  percentage: string;
+  isActive: boolean;
+  usageLimit: string;
+  expiresAt: string;
+};
 
 const ADMIN_PREVIEW_FALLBACK_IMAGE = '/glowmia-logo.svg';
+const INITIAL_COUPON_FORM: CouponFormState = {
+  code: '',
+  percentage: '10',
+  isActive: true,
+  usageLimit: '',
+  expiresAt: '',
+};
 
 type AdminFormState = {
   name: string;
@@ -422,7 +437,7 @@ export const getServerSideProps: GetServerSideProps<AdminPageProps> = async ({ r
     props: {
       configured,
       authenticated: true,
-      designs: await getAllDesignsFromSupabase(),
+      designs: await getAllDesignsFromSupabase({ includeHidden: true, forceRefresh: true }),
     },
   };
 };
@@ -545,6 +560,56 @@ export default function AtelierVaultPage({
           discountRedeemed: 'Redeemed',
           redeemedBy: 'Redeemed by',
         };
+  const couponUi =
+    language === 'ar'
+      ? {
+          createTitle: 'إنشاء كوبون',
+          code: 'الكود',
+          percentage: 'نسبة الخصم',
+          active: 'مفعل',
+          usageLimit: 'حد الاستخدام',
+          expiryDate: 'تاريخ الانتهاء',
+          saveCoupon: 'حفظ الكوبون',
+          savingCoupon: 'جارٍ الحفظ...',
+          updateCoupon: 'تحديث الكوبون',
+          statusActive: 'مفعل',
+          statusInactive: 'غير مفعل',
+          usedCount: 'عدد الاستخدامات',
+          noLimit: 'بدون حد',
+          noExpiry: 'بدون انتهاء',
+          homepageSection: 'قسم الصفحة الرئيسية',
+          collectionSection: 'قسم المجموعة',
+          displayOrder: 'ترتيب العرض',
+          visible: 'ظاهر',
+          hidden: 'مخفي',
+          featured: 'مميز',
+          saveDisplay: 'حفظ الترتيب',
+          savingDisplay: 'جارٍ الحفظ...',
+        }
+      : {
+          createTitle: 'Create coupon',
+          code: 'Code',
+          percentage: 'Discount percentage',
+          active: 'Active',
+          usageLimit: 'Usage limit',
+          expiryDate: 'Expiry date',
+          saveCoupon: 'Save coupon',
+          savingCoupon: 'Saving...',
+          updateCoupon: 'Update coupon',
+          statusActive: 'Active',
+          statusInactive: 'Inactive',
+          usedCount: 'Used count',
+          noLimit: 'No limit',
+          noExpiry: 'No expiry',
+          homepageSection: 'Homepage section',
+          collectionSection: 'Collection section',
+          displayOrder: 'Display order',
+          visible: 'Visible',
+          hidden: 'Hidden',
+          featured: 'Featured',
+          saveDisplay: 'Save display',
+          savingDisplay: 'Saving...',
+        };
 
   const [catalogDesigns, setCatalogDesigns] = useState(designs);
   const [username, setUsername] = useState('');
@@ -572,8 +637,10 @@ export default function AtelierVaultPage({
   const [discountCodes, setDiscountCodes] = useState<DiscountCodeEntry[] | null>(null);
   const [discountCodesLoading, setDiscountCodesLoading] = useState(false);
   const [discountCodesError, setDiscountCodesError] = useState('');
-  const [discountPercentage, setDiscountPercentage] = useState('10');
+  const [couponForm, setCouponForm] = useState<CouponFormState>(INITIAL_COUPON_FORM);
   const [discountGenerateState, setDiscountGenerateState] = useState<'idle' | 'saving'>('idle');
+  const [couponUpdateId, setCouponUpdateId] = useState<string | null>(null);
+  const [displaySaveId, setDisplaySaveId] = useState<string | null>(null);
   const [orderPreview, setOrderPreview] = useState<{ src: string; alt: string } | null>(null);
 
   const editorOpen = editorMode !== null;
@@ -759,13 +826,77 @@ export default function AtelierVaultPage({
     setDiscountCodesError('');
 
     try {
-      const nextCode = await generateAdminDiscountCode(Number(discountPercentage));
+      const nextCode = await createAdminDiscountCode({
+        code: couponForm.code,
+        percentage: Number(couponForm.percentage),
+        isActive: couponForm.isActive,
+        usageLimit: couponForm.usageLimit ? Number(couponForm.usageLimit) : null,
+        expiresAt: couponForm.expiresAt || null,
+      });
       setDiscountCodes((current) => [nextCode, ...(current ?? [])]);
-      setDiscountPercentage('10');
+      setCouponForm(INITIAL_COUPON_FORM);
     } catch (error) {
       setDiscountCodesError(error instanceof Error ? error.message : 'Unable to generate discount code.');
     } finally {
       setDiscountGenerateState('idle');
+    }
+  };
+
+  const handleUpdateCoupon = async (entry: DiscountCodeEntry) => {
+    setCouponUpdateId(entry.id);
+    setDiscountCodesError('');
+
+    try {
+      const updated = await updateAdminDiscountCode({
+        id: entry.id,
+        code: entry.code,
+        percentage: entry.percentage,
+        isActive: entry.isActive,
+        usageLimit: entry.usageLimit,
+        expiresAt: entry.expiresAt,
+      });
+      setDiscountCodes((current) => (current ?? []).map((coupon) => (coupon.id === updated.id ? updated : coupon)));
+    } catch (error) {
+      setDiscountCodesError(error instanceof Error ? error.message : 'Unable to update the coupon.');
+    } finally {
+      setCouponUpdateId(null);
+    }
+  };
+
+  const updateCouponEntry = (couponId: string, updater: (entry: DiscountCodeEntry) => DiscountCodeEntry) => {
+    setDiscountCodes((current) => (current ?? []).map((entry) => (entry.id === couponId ? updater(entry) : entry)));
+  };
+
+  const handleSaveDesignDisplay = async (design: Design) => {
+    setDisplaySaveId(design.id);
+    setPanelError('');
+    setPanelMessage('');
+
+    try {
+      const response = await fetch('/api/admin/dresses/update-display', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: design.id,
+          displayOrder: design.displayOrder,
+          isFeatured: design.isFeatured,
+          isVisible: design.isVisible,
+          homepageSection: design.homepageSection,
+          collectionSection: design.collectionSection,
+        }),
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        setPanelError(payload.error ?? 'Unable to update dress display settings.');
+        return;
+      }
+
+      setPanelMessage(language === 'ar' ? 'تم حفظ ترتيب العرض.' : 'Dress display settings saved.');
+    } catch (error) {
+      setPanelError(error instanceof Error ? error.message : 'Unable to update dress display settings.');
+    } finally {
+      setDisplaySaveId(null);
     }
   };
 
@@ -902,6 +1033,15 @@ export default function AtelierVaultPage({
       day: 'numeric',
       year: 'numeric',
     });
+
+  const toDateInputValue = (value: string | null | undefined) => {
+    if (!value) {
+      return '';
+    }
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+  };
 
   const insightsView = (
     <section className="space-y-4 md:space-y-6">
@@ -1255,10 +1395,29 @@ export default function AtelierVaultPage({
       </div>
 
       <form onSubmit={handleGenerateDiscountCode} className="grid gap-3 rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-soft)] sm:grid-cols-[minmax(0,1fr)_auto] md:p-5">
-        <Field label={insightsUi.discountPercent}>
+        <Field label={couponUi.code}>
           <input
-            value={discountPercentage}
-            onChange={(event) => setDiscountPercentage(event.target.value)}
+            value={couponForm.code}
+            onChange={(event) =>
+              setCouponForm((current) => ({
+                ...current,
+                code: event.target.value,
+              }))
+            }
+            className="field-input"
+            placeholder="SUMMER10"
+          />
+        </Field>
+        
+        <Field label={couponUi.percentage}>
+          <input
+            value={couponForm.percentage}
+            onChange={(event) =>
+              setCouponForm((current) => ({
+                ...current,
+                percentage: event.target.value,
+              }))
+            }
             className="field-input"
             inputMode="numeric"
             min={1}
@@ -1298,14 +1457,25 @@ export default function AtelierVaultPage({
                   <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{formatAdminDate(entry.createdAt)}</p>
                   <h3 className="break-all text-2xl font-semibold text-[color:var(--text-primary)]">{entry.code}</h3>
                   <p className="text-sm text-[color:var(--text-muted)]">
-                    {entry.percentage}% · {insightsUi.discountStatus}: {entry.redeemedAt ? insightsUi.discountRedeemed : insightsUi.discountActive}
+                    {entry.percentage}% · {insightsUi.discountStatus}: {entry.isActive ? couponUi.statusActive : couponUi.statusInactive}
                   </p>
-                  {entry.redeemedAt ? (
-                    <p className="text-sm text-[color:var(--text-muted)]">
-                      {insightsUi.redeemedBy}: {entry.redeemedCustomerName || '—'} · {entry.redeemedOrderId || '—'}
-                    </p>
-                  ) : null}
+                  <p className="text-sm text-[color:var(--text-muted)]">
+                    {couponUi.usedCount}: {entry.usedCount} · {entry.usageLimit ? `${entry.usedCount}/${entry.usageLimit}` : couponUi.noLimit}
+                  </p>
                 </div>
+                <button
+                  onClick={() =>
+                    void handleUpdateCoupon({
+                      ...entry,
+                      isActive: !entry.isActive,
+                    })
+                  }
+                  disabled={couponUpdateId === entry.id}
+                  className={`secondary-button flex items-center justify-center whitespace-nowrap px-4 ${entry.isActive ? 'bg-[#4a7c59]/20 text-[#4a7c59]' : 'bg-[#b2555d]/20 text-[#b2555d]'}`}
+                  title={entry.isActive ? 'Deactivate coupon' : 'Activate coupon'}
+                >
+                  {couponUpdateId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : entry.isActive ? 'Active' : 'Inactive'}
+                </button>
               </article>
             ))}
           </div>

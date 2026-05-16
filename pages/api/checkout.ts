@@ -9,6 +9,22 @@ type ApiResponse = {
     percentage: number;
     amount: number;
   } | null;
+  emailStatus?: {
+    customer: {
+      ok: boolean;
+      skipped?: boolean;
+      error?: string;
+      messageId?: string | null;
+      target?: string;
+    };
+    team: {
+      ok: boolean;
+      skipped?: boolean;
+      error?: string;
+      messageId?: string | null;
+      target?: string;
+    };
+  };
   error?: string;
 };
 
@@ -22,7 +38,7 @@ export default async function handler(request: NextApiRequest, response: NextApi
   }
 
   try {
-    const result = await createOrderFromRequestBody(request.body as OrdersCreateRequestBody, { notifyTeam: false });
+    const result = await createOrderFromRequestBody(request.body as OrdersCreateRequestBody, { notifyTeam: true });
     console.info(`[api/checkout] Completed with status ${result.status}.`);
     response.status(result.status).json(result.body);
   } catch (error) {

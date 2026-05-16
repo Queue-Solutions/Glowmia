@@ -1,9 +1,7 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="128" cy="128" r="99" fill="#F2E7D5"/>
-  <circle cx="128" cy="83" r="35" fill="#11110F"/>
-  <circle cx="83" cy="128" r="35" fill="#11110F"/>
-  <circle cx="173" cy="128" r="35" fill="#11110F"/>
-  <circle cx="128" cy="173" r="35" fill="#11110F"/>
-  <circle cx="128" cy="128" r="49" fill="#11110F"/>
-  <circle cx="128" cy="128" r="18" fill="#F2E7D5"/>
+  <!-- Circle background -->
+  <circle cx="128" cy="128" r="120" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="1"/>
+
+  <!-- G letter -->
+  <text x="128" y="155" font-family="Georgia, serif" font-size="110" font-weight="500" text-anchor="middle" fill="#241715">G</text>
 </svg>

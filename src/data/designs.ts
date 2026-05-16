@@ -31,6 +31,10 @@ export type Design = {
   detailImage?: string;
   galleryImages: string[];
   isFeatured: boolean;
+  isVisible: boolean;
+  displayOrder: number;
+  homepageSection: string | null;
+  collectionSection: string | null;
   isNew: boolean;
 };
 
@@ -64,6 +68,10 @@ export type DressRow = {
   back_view_url?: string | null;
   created_at?: string | null;
   is_featured?: boolean | null;
+  display_order?: number | null;
+  homepage_section?: string | null;
+  collection_section?: string | null;
+  is_visible?: boolean | null;
   gallery_image_urls?: string[] | null;
   gallery_images?: string[] | null;
   image_urls?: string[] | null;
@@ -310,6 +318,13 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
   const subtitleAr = buildSubtitleValue(row, 'ar');
   const rowPrice = normalizePrice(row.price ?? row.price_egp);
 
+  const homepageSection = cleanText(row.homepage_section, '') || null;
+  const collectionSection = cleanText(row.collection_section, '') || null;
+  const hasExplicitFeaturedFlag = typeof row.is_featured === 'boolean' || Boolean(homepageSection);
+  const isFeatured = hasExplicitFeaturedFlag ? Boolean(row.is_featured) || homepageSection === 'featured' : index < 3;
+  const isVisible = row.is_visible !== false;
+  const displayOrder = Number.isFinite(Number(row.display_order)) ? Number(row.display_order) : 0;
+
   return {
     id,
     slug: buildDesignSlug(id, name),
@@ -341,7 +356,11 @@ export function normalizeDressRow(row: DressRow, index: number): Design {
     coverImagePosition: 'center top',
     detailImage,
     galleryImages,
-    isFeatured: Boolean(row.is_featured) || index < 3,
+    isFeatured,
+    isVisible,
+    displayOrder,
+    homepageSection,
+    collectionSection,
     isNew: isRecentDress(row.created_at, index),
   };
 }
@@ -371,7 +390,22 @@ export function getDesignCategoryLabel(category: DesignCategory): LocalizedText 
 }
 
 export function getFeaturedDesignsFromList(designs: Design[]) {
-  return designs.filter((design) => design.isFeatured).slice(0, 3);
+  return designs
+    .filter((design) => design.isFeatured)
+    .sort((left, right) => {
+      const sectionScore = Number(right.homepageSection === 'featured') - Number(left.homepageSection === 'featured');
+
+      if (sectionScore !== 0) {
+        return sectionScore;
+      }
+
+      if (left.displayOrder !== right.displayOrder) {
+        return left.displayOrder - right.displayOrder;
+      }
+
+      return right.id.localeCompare(left.id);
+    })
+    .slice(0, 3);
 }
 
 export function getDesignBySlug(designs: Design[], slug: string) {

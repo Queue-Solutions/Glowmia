@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { isAdminAuthenticatedRequest } from '@/src/lib/adminAuth';
-import { createDiscountCode, listDiscountCodes } from '@/src/lib/discountCodes';
+import { createDiscountCode, listDiscountCodes, updateDiscountCode } from '@/src/lib/discountCodes';
 
 export default async function handler(request: NextApiRequest, response: NextApiResponse) {
   response.setHeader('Cache-Control', 'no-store');
 
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    response.setHeader('Allow', 'GET, POST');
+  if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PATCH') {
+    response.setHeader('Allow', 'GET, POST, PATCH');
     response.status(405).json({ error: 'Method not allowed.' });
     return;
   }
@@ -22,18 +22,54 @@ export default async function handler(request: NextApiRequest, response: NextApi
       return;
     }
 
-    const percentage = Number(request.body?.percentage ?? 0);
+    const payload = {
+      code: typeof request.body?.code === 'string' ? request.body.code : '',
+      percentage: Number(request.body?.percentage ?? 0),
+      isActive: request.body?.isActive !== false,
+      usageLimit: request.body?.usageLimit ?? null,
+      expiresAt: request.body?.expiresAt ?? null,
+    };
 
-    if (!Number.isFinite(percentage) || percentage < 1 || percentage > 100) {
-      response.status(400).json({ error: 'Discount percentage must be between 1 and 100.' });
+    console.info('[api/admin/discount-codes] Request received', {
+      method: request.method,
+      requestBody: request.body,
+      normalizedPayload: payload,
+    });
+
+    if (request.method === 'POST') {
+      const created = await createDiscountCode(payload);
+      console.info('[api/admin/discount-codes] Coupon created', {
+        id: created.id,
+        code: created.code,
+        percentage: created.percentage,
+      });
+      response.status(201).json({
+        ok: true,
+        code: created,
+      });
       return;
     }
 
-    response.status(201).json({
+    const couponId = typeof request.body?.id === 'string' ? request.body.id.trim() : '';
+
+    if (!couponId) {
+      response.status(400).json({ error: 'Coupon id is required.' });
+      return;
+    }
+
+    response.status(200).json({
       ok: true,
-      code: await createDiscountCode(percentage),
+      code: await updateDiscountCode({
+        id: couponId,
+        ...payload,
+      }),
     });
   } catch (error) {
+    console.error('[api/admin/discount-codes] Error', {
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      error,
+    });
     response.status(500).json({
       error: error instanceof Error ? error.message : 'Unable to manage discount codes.',
     });

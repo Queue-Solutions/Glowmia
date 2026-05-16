@@ -9,6 +9,22 @@ type ApiResponse = {
     percentage: number;
     amount: number;
   } | null;
+  emailStatus?: {
+    customer: {
+      ok: boolean;
+      skipped?: boolean;
+      error?: string;
+      messageId?: string | null;
+      target?: string;
+    };
+    team: {
+      ok: boolean;
+      skipped?: boolean;
+      error?: string;
+      messageId?: string | null;
+      target?: string;
+    };
+  };
   error?: string;
 };
 

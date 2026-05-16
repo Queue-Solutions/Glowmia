@@ -30,6 +30,12 @@ export type CheckoutOrderRecord = {
     address: string;
     city: string;
   };
+  pricing?: {
+    couponCode?: string | null;
+    discountPercentage?: number | null;
+    discountAmount?: number | null;
+    finalTotal?: number | null;
+  };
   items: Array<{
     designId: string;
     designName: string;
@@ -83,6 +89,7 @@ type CreateOrderRowsInput = {
   customer: CheckoutOrderRecord['customer'];
   items: CheckoutOrderRecord['items'];
   notes: string;
+  pricing?: CheckoutOrderRecord['pricing'];
   status?: string;
   userId?: string | null;
   guestId?: string | null;
@@ -127,6 +134,10 @@ const ORDER_FIELDS = [
   'notes',
   'status',
   'created_at',
+  'coupon_code',
+  'discount_percentage',
+  'discount_amount',
+  'final_total',
 ] as const;
 
 let supabaseClient: SupabaseClient | null | undefined;
@@ -297,7 +308,14 @@ async function getAvailableColumns(table: string, candidates: readonly string[])
 }
 
 function buildSelect(columns: Set<string>, candidates: readonly string[]) {
-  return candidates.filter((column) => columns.has(column)).join(', ');
+  const selected = candidates.filter((column) => columns.has(column)).join(', ');
+
+  if (!selected) {
+    console.warn('[glowmiaOrders.buildSelect] Empty select clause, falling back to all candidates');
+    return candidates.join(', ');
+  }
+
+  return selected;
 }
 
 function readSavedDesign(row: Record<string, unknown>): SavedDesignRecord {
@@ -336,6 +354,12 @@ function readCheckoutOrder(row: Record<string, unknown>) {
       email: readString(row.email),
       address: readString(row.address),
       city: readString(row.city),
+    },
+    pricing: {
+      couponCode: readOptionalString(row.coupon_code),
+      discountPercentage: row.discount_percentage === null || row.discount_percentage === undefined ? null : Number(row.discount_percentage) || 0,
+      discountAmount: row.discount_amount === null || row.discount_amount === undefined ? null : Number(row.discount_amount) || 0,
+      finalTotal: row.final_total === null || row.final_total === undefined ? null : Number(row.final_total) || 0,
     },
     items: [
       {
@@ -547,6 +571,22 @@ export async function createCheckoutOrders(input: CreateOrderRowsInput) {
 
     if (columns.has('notes')) {
       row.notes = input.notes || '';
+    }
+
+    if (columns.has('coupon_code')) {
+      row.coupon_code = input.pricing?.couponCode || null;
+    }
+
+    if (columns.has('discount_percentage')) {
+      row.discount_percentage = input.pricing?.discountPercentage ?? null;
+    }
+
+    if (columns.has('discount_amount')) {
+      row.discount_amount = input.pricing?.discountAmount ?? 0;
+    }
+
+    if (columns.has('final_total')) {
+      row.final_total = input.pricing?.finalTotal ?? null;
     }
 
     if (columns.has('status')) {

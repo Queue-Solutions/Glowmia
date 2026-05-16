@@ -9,7 +9,8 @@ import {
   upsertNewsletterSubscriber,
 } from '@/src/lib/newsletter';
 import { calculateDiscountAmount } from '@/src/lib/pricing';
-import { sendCustomerOrderEmail, sendTeamOrderNotification } from '@/src/server/email';
+import { getTeamOrderNotificationTarget, sendCustomerOrderEmail, sendTeamOrderNotification } from '@/src/server/email';
+import { isEmailConfigurationError, maskEmailForLogs } from '@/src/lib/sendEmail';
 
 type CheckoutItemInput = {
   designId?: unknown;
@@ -32,6 +33,18 @@ export type OrdersCreateRequestBody = {
   userId?: unknown;
   guestId?: unknown;
 };
+
+type EmailDeliveryStatus = {
+  ok: boolean;
+  skipped?: boolean;
+  error?: string;
+  messageId?: string | null;
+  target?: string;
+};
+
+function readFirstOrderTimestamp(createdAt: string | undefined) {
+  return createdAt || new Date().toISOString();
+}
 
 type CheckoutOrderItem = CheckoutOrderRecord['items'][number];
 
@@ -187,13 +200,14 @@ export async function createOrderFromRequestBody(
         amount: discountAmount,
       };
     }
+    const finalTotal = Math.max(0, subtotal - discountAmount);
 
     const pricingNote =
       subtotal > 0
         ? [
             `Subtotal: ${subtotal}`,
             appliedDiscount ? `Discount ${appliedDiscount.code} (${appliedDiscount.percentage}%): -${discountAmount}` : '',
-            `Total: ${Math.max(0, subtotal - discountAmount)}`,
+            `Total: ${finalTotal}`,
           ]
             .filter(Boolean)
             .join('\n')
@@ -204,12 +218,27 @@ export async function createOrderFromRequestBody(
       customer,
       items,
       notes: orderNotes,
+      pricing: {
+        couponCode: appliedDiscount?.code ?? null,
+        discountPercentage: appliedDiscount?.percentage ?? null,
+        discountAmount,
+        finalTotal,
+      },
       userId: savedDesign?.userId || userId,
       guestId: savedDesign?.guestId || guestId,
       status: 'pending',
     });
 
     const orderReference = createdOrders[0]?.id || '';
+    const orderTimestamp = readFirstOrderTimestamp(createdOrders[0]?.createdAt);
+
+    console.info('[orders.create] Order saved.', {
+      orderId: orderReference,
+      customerEmailTarget: maskEmailForLogs(customer.email),
+      adminEmailTarget: maskEmailForLogs(getTeamOrderNotificationTarget()),
+      itemCount: items.length,
+      notifyTeam: Boolean(options.notifyTeam),
+    });
 
     if (savedDesign?.id && orderReference) {
       await markSavedDesignOrdered(savedDesign.id, orderReference);
@@ -244,14 +273,21 @@ export async function createOrderFromRequestBody(
         items,
         subtotal,
         discount: appliedDiscount,
-        total: Math.max(0, subtotal - discountAmount),
+        total: finalTotal,
       },
     });
 
-    await sendCustomerOrderEmail({
+    const customerEmailPayload = {
       email: customer.email,
       customerName: customer.name,
       orderId: orderReference,
+      pricing: {
+        subtotal,
+        discountCode: appliedDiscount?.code ?? null,
+        discountPercentage: appliedDiscount?.percentage ?? null,
+        discountAmount,
+        finalTotal,
+      },
       items: items.map((item) => ({
         designId: item.designId,
         designName: item.designName,
@@ -259,21 +295,107 @@ export async function createOrderFromRequestBody(
         quantity: item.quantity,
         size: item.size,
       })),
-    });
+    };
+    const teamEmailPayload = {
+      orderId: orderReference,
+      createdAt: orderTimestamp,
+      customer,
+      pricing: {
+        subtotal,
+        discountCode: appliedDiscount?.code ?? null,
+        discountPercentage: appliedDiscount?.percentage ?? null,
+        discountAmount: appliedDiscount?.amount ?? null,
+        total: finalTotal,
+      },
+      metadata: {
+        paymentMethod: null,
+        deliveryMethod: null,
+        whatsappNumber: customer.phone,
+        userId,
+        guestId,
+      },
+      items: items.map((item) => ({
+        designId: item.designId,
+        designName: item.designName,
+        designSlug: designsById.get(item.designId)?.slug ?? null,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+        unitPrice: item.unitPrice ?? null,
+        lineTotal: item.lineTotal ?? null,
+      })),
+      notes: orderNotes,
+    };
+    const emailStatus: {
+      customer: EmailDeliveryStatus;
+      team: EmailDeliveryStatus;
+    } = {
+      customer: {
+        ok: false,
+        target: maskEmailForLogs(customer.email),
+      },
+      team: {
+        ok: false,
+        target: maskEmailForLogs(getTeamOrderNotificationTarget()),
+        skipped: !options.notifyTeam,
+      },
+    };
+
+    try {
+      const delivery = await sendCustomerOrderEmail(customerEmailPayload);
+      emailStatus.customer = {
+        ok: true,
+        messageId: delivery.messageId ?? null,
+        target: maskEmailForLogs(customer.email),
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to send customer confirmation email.';
+
+      console.error('[orders.create] Customer confirmation email failed.', {
+        orderId: orderReference,
+        customerEmailTarget: maskEmailForLogs(customer.email),
+        error: message,
+        isConfigurationError: isEmailConfigurationError(error),
+      });
+
+      emailStatus.customer = {
+        ok: false,
+        error: message,
+        target: maskEmailForLogs(customer.email),
+      };
+    }
 
     if (options.notifyTeam) {
-      await sendTeamOrderNotification({
-        orderId: orderReference,
-        customer,
-        items: items.map((item) => ({
-          designId: item.designId,
-          designName: item.designName,
-          quantity: item.quantity,
-          size: item.size,
-          color: item.color,
-        })),
-        notes: orderNotes,
-      });
+      try {
+        const delivery = await sendTeamOrderNotification(teamEmailPayload);
+        emailStatus.team = {
+          ok: !delivery.skipped,
+          skipped: Boolean(delivery.skipped),
+          messageId: delivery.messageId ?? null,
+          target: maskEmailForLogs(delivery.to || getTeamOrderNotificationTarget()),
+        };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Unable to send admin order notification.';
+
+        console.error('[orders.create] Team order notification failed.', {
+          orderId: orderReference,
+          adminEmailTarget: maskEmailForLogs(getTeamOrderNotificationTarget()),
+          error: message,
+          isConfigurationError: isEmailConfigurationError(error),
+        });
+
+        emailStatus.team = {
+          ok: false,
+          error: message,
+          target: maskEmailForLogs(getTeamOrderNotificationTarget()),
+        };
+      }
     }
 
     await clearAbandonedCart(customer.email);
@@ -284,6 +406,12 @@ export async function createOrderFromRequestBody(
         ok: true,
         orderId: orderReference,
         discount: appliedDiscount,
+        finalTotal,
+        ...(process.env.NODE_ENV !== 'production'
+          ? {
+              emailStatus,
+            }
+          : {}),
       },
     };
   } catch (error) {
