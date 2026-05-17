@@ -390,8 +390,10 @@ export function getDesignCategoryLabel(category: DesignCategory): LocalizedText 
 }
 
 export function getFeaturedDesignsFromList(designs: Design[]) {
-  return designs
-    .filter((design) => design.isFeatured)
+  const featuredDesigns = designs.filter((design) => design.isFeatured);
+  const sourceDesigns = featuredDesigns.length > 0 ? featuredDesigns : designs;
+
+  return [...sourceDesigns]
     .sort((left, right) => {
       const sectionScore = Number(right.homepageSection === 'featured') - Number(left.homepageSection === 'featured');
 

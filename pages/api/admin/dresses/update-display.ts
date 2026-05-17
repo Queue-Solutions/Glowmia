@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { isAdminAuthenticatedRequest } from '@/src/lib/adminAuth';
 import { getSupabaseAdminClient } from '@/src/lib/adminSupabase';
+import { clearDesignsCache } from '@/src/services/dresses';
 
 const DISPLAY_COLUMNS = ['display_order', 'is_featured', 'homepage_section', 'collection_section', 'is_visible'] as const;
 
@@ -88,6 +89,9 @@ export default async function handler(request: NextApiRequest, response: NextApi
       response.status(500).json({ error: error.message });
       return;
     }
+
+    clearDesignsCache();
+    await Promise.allSettled([response.revalidate('/designs'), response.revalidate('/')]);
 
     response.status(200).json({ ok: true });
   } catch (error) {

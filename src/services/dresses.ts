@@ -60,6 +60,12 @@ let dressColumnsPromise: Promise<Set<string>> | null = null;
 
 export const PUBLIC_PAGE_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
 
+export function clearDesignsCache() {
+  designsCache.data = [];
+  designsCache.expiresAt = 0;
+  designsCache.pending = null;
+}
+
 function getFallbackDesigns() {
   return fallbackDressRows.map((row, index) => normalizeDressRow(row, index));
 }

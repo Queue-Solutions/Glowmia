@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BadgePercent, Heart, Loader2, LogOut, Menu, Pencil, Plus, Shield, Star, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgePercent, Eye, EyeOff, Heart, Loader2, LogOut, Menu, Pencil, Plus, Save, Shield, Star, Trash2, X } from 'lucide-react';
 import { getAllDesignsFromSupabase } from '@/src/services/dresses';
 import type { Design } from '@/src/data/designs';
 import { getAdminUsernameFromRequest, isAdminConfigured } from '@/src/lib/adminAuth';
@@ -585,6 +585,13 @@ export default function AtelierVaultPage({
           featured: 'مميز',
           saveDisplay: 'حفظ الترتيب',
           savingDisplay: 'جارٍ الحفظ...',
+          moveUp: 'رفع',
+          moveDown: 'تنزيل',
+          saveGalleryOrder: 'حفظ ترتيب المعرض',
+          savingGalleryOrder: 'جارٍ حفظ ترتيب المعرض...',
+          galleryOrderTitle: 'ترتيب معرض التصاميم',
+          galleryOrderDescription: 'استخدمي أزرار الرفع والتنزيل لاختيار ما يظهر أولًا في صفحة التصاميم، ثم احفظي الترتيب.',
+          showInGallery: 'إظهار في المعرض',
         }
       : {
           createTitle: 'Create coupon',
@@ -609,6 +616,13 @@ export default function AtelierVaultPage({
           featured: 'Featured',
           saveDisplay: 'Save display',
           savingDisplay: 'Saving...',
+          moveUp: 'Move up',
+          moveDown: 'Move down',
+          saveGalleryOrder: 'Save gallery order',
+          savingGalleryOrder: 'Saving gallery order...',
+          galleryOrderTitle: 'Design gallery order',
+          galleryOrderDescription: 'Use the move buttons to choose what appears first on the public Designs page, then save the order.',
+          showInGallery: 'Show in gallery',
         };
 
   const [catalogDesigns, setCatalogDesigns] = useState(designs);
@@ -893,6 +907,83 @@ export default function AtelierVaultPage({
       }
 
       setPanelMessage(language === 'ar' ? 'تم حفظ ترتيب العرض.' : 'Dress display settings saved.');
+    } catch (error) {
+      setPanelError(error instanceof Error ? error.message : 'Unable to update dress display settings.');
+    } finally {
+      setDisplaySaveId(null);
+    }
+  };
+
+  const resequenceCatalogDesigns = (nextDesigns: Design[]) =>
+    nextDesigns.map((design, index) => ({
+      ...design,
+      displayOrder: (index + 1) * 10,
+    }));
+
+  const updateCatalogDesignDisplay = (designId: string, updates: Partial<Pick<Design, 'displayOrder' | 'isFeatured' | 'isVisible' | 'homepageSection' | 'collectionSection'>>) => {
+    setCatalogDesigns((current) =>
+      current.map((design) =>
+        design.id === designId
+          ? {
+              ...design,
+              ...updates,
+            }
+          : design,
+      ),
+    );
+  };
+
+  const moveCatalogDesign = (designId: string, direction: -1 | 1) => {
+    setCatalogDesigns((current) => {
+      const currentIndex = current.findIndex((design) => design.id === designId);
+      const targetIndex = currentIndex + direction;
+
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= current.length) {
+        return current;
+      }
+
+      const nextDesigns = [...current];
+      const [movedDesign] = nextDesigns.splice(currentIndex, 1);
+      nextDesigns.splice(targetIndex, 0, movedDesign);
+      return resequenceCatalogDesigns(nextDesigns);
+    });
+  };
+
+  const handleSaveGalleryOrder = async () => {
+    const orderedDesigns = resequenceCatalogDesigns(catalogDesigns);
+    setDisplaySaveId('__gallery__');
+    setPanelError('');
+    setPanelMessage('');
+    setCatalogDesigns(orderedDesigns);
+
+    try {
+      const results = await Promise.all(
+        orderedDesigns.map(async (design) => {
+          const response = await fetch('/api/admin/dresses/update-display', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: design.id,
+              displayOrder: design.displayOrder,
+              isFeatured: design.isFeatured,
+              isVisible: design.isVisible,
+              homepageSection: design.homepageSection,
+              collectionSection: design.collectionSection,
+            }),
+          });
+          const payload = (await response.json()) as { error?: string };
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? 'Unable to update dress display settings.');
+          }
+
+          return payload;
+        }),
+      );
+
+      if (results.length > 0) {
+        setPanelMessage(language === 'ar' ? 'تم حفظ ترتيب معرض التصاميم.' : 'Design gallery order saved.');
+      }
     } catch (error) {
       setPanelError(error instanceof Error ? error.message : 'Unable to update dress display settings.');
     } finally {
@@ -1727,10 +1818,25 @@ export default function AtelierVaultPage({
                         <h2 className="font-display text-3xl text-[color:var(--text-primary)] sm:text-4xl md:text-5xl">{ui.currentDesigns}</h2>
                         <p className="max-w-3xl text-sm leading-7 text-[color:var(--text-muted)] md:text-base md:leading-8">{ui.currentDesignsDescription}</p>
                       </div>
-                      <div className="w-fit rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-4 py-2 text-sm text-[color:var(--text-muted)]">
-                        {ui.designCount(catalogDesigns.length)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="w-fit rounded-full border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-4 py-2 text-sm text-[color:var(--text-muted)]">
+                          {ui.designCount(catalogDesigns.length)}
+                        </div>
+                        {catalogDesigns.length > 0 ? (
+                          <button type="button" onClick={() => void handleSaveGalleryOrder()} className="primary-button" disabled={displaySaveId === '__gallery__'}>
+                            {displaySaveId === '__gallery__' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            {displaySaveId === '__gallery__' ? couponUi.savingGalleryOrder : couponUi.saveGalleryOrder}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
+
+                    {catalogDesigns.length > 0 ? (
+                      <div className="rounded-[1.5rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-4 py-4">
+                        <h3 className="text-base font-semibold text-[color:var(--text-primary)]">{couponUi.galleryOrderTitle}</h3>
+                        <p className="mt-1 text-sm leading-7 text-[color:var(--text-muted)]">{couponUi.galleryOrderDescription}</p>
+                      </div>
+                    ) : null}
 
                     {catalogDesigns.length === 0 ? (
                       <div className="rounded-[2rem] border border-dashed border-[color:var(--line)] bg-[color:var(--surface-elevated)] px-6 py-12 text-center">
@@ -1742,7 +1848,7 @@ export default function AtelierVaultPage({
                       </div>
                     ) : (
                       <div className="grid gap-3 md:gap-5 xl:grid-cols-2">
-                        {catalogDesigns.map((design) => (
+                        {catalogDesigns.map((design, index) => (
                           <article
                             key={design.id}
                             className={`overflow-hidden rounded-[1.35rem] border border-[color:var(--line)] bg-[color:var(--surface-elevated)] shadow-[var(--shadow-soft)] transition md:rounded-[1.8rem] ${editingDesignId === design.id && editorOpen ? 'ring-1 ring-[color:var(--accent)]' : ''}`}
@@ -1786,6 +1892,84 @@ export default function AtelierVaultPage({
                                       </span>
                                     ))}
                                   </div>
+                                </div>
+
+                                <div className="grid gap-3 rounded-[1.1rem] border border-[color:var(--line)] bg-[color:var(--surface-base)] p-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                      <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{couponUi.displayOrder}</p>
+                                      <p className="text-sm font-semibold text-[color:var(--text-primary)]">#{index + 1}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => moveCatalogDesign(design.id, -1)}
+                                        className="secondary-button min-h-[2.5rem] px-3"
+                                        disabled={index === 0 || displaySaveId === '__gallery__'}
+                                        aria-label={couponUi.moveUp}
+                                        title={couponUi.moveUp}
+                                      >
+                                        <ArrowUp className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => moveCatalogDesign(design.id, 1)}
+                                        className="secondary-button min-h-[2.5rem] px-3"
+                                        disabled={index === catalogDesigns.length - 1 || displaySaveId === '__gallery__'}
+                                        aria-label={couponUi.moveDown}
+                                        title={couponUi.moveDown}
+                                      >
+                                        <ArrowDown className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    <label className="space-y-1">
+                                      <span className="text-xs text-[color:var(--text-muted)]">{couponUi.displayOrder}</span>
+                                      <input
+                                        value={design.displayOrder}
+                                        onChange={(event) => updateCatalogDesignDisplay(design.id, { displayOrder: Number(event.target.value) || 0 })}
+                                        className="field-input min-h-[2.5rem]"
+                                        inputMode="numeric"
+                                      />
+                                    </label>
+                                    <div className="grid gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => updateCatalogDesignDisplay(design.id, { isVisible: !design.isVisible })}
+                                        className={design.isVisible ? 'primary-button justify-center' : 'secondary-button justify-center'}
+                                        aria-pressed={design.isVisible}
+                                      >
+                                        {design.isVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                        {design.isVisible ? couponUi.visible : couponUi.hidden}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateCatalogDesignDisplay(design.id, {
+                                            isFeatured: !design.isFeatured,
+                                            homepageSection: !design.isFeatured ? 'featured' : null,
+                                          })
+                                        }
+                                        className={design.isFeatured ? 'primary-button justify-center' : 'secondary-button justify-center'}
+                                        aria-pressed={design.isFeatured}
+                                      >
+                                        <Star className={`h-4 w-4 ${design.isFeatured ? 'fill-current' : ''}`} />
+                                        {couponUi.featured}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSaveDesignDisplay(design)}
+                                    className="secondary-button justify-center"
+                                    disabled={displaySaveId === design.id || displaySaveId === '__gallery__'}
+                                  >
+                                    {displaySaveId === design.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    {displaySaveId === design.id ? couponUi.savingDisplay : couponUi.saveDisplay}
+                                  </button>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
